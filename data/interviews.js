@@ -314,7 +314,7 @@ window.INTERVIEWS = [
     id: "i05",
     name: "가나다라",
     date: "2026-11-26",
-    time: "",
+    time: "13:00",
     duration: "약 72분",
     type: "본 인터뷰",
     source: "베타 테스터",
