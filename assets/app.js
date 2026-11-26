@@ -212,6 +212,17 @@
       try { localStorage.setItem("ovOnlyMain", onlyMain ? "1" : "0"); } catch (e) {}
       renderOverview({ tab: tab });
     });
+    Array.prototype.forEach.call(main.querySelectorAll(".voice-link[data-find]"), function (a) {
+      a.addEventListener("click", function (e) {
+        var find = a.getAttribute("data-find"); if (!find) return;
+        e.preventDefault();
+        var id = a.getAttribute("data-iv");
+        loadTranscript(id, function (turns) {
+          var i = findTurn(turns, find);
+          location.hash = trLink(id, i >= 0 ? turns[i].t : "", find).slice(1);
+        });
+      });
+    });
     Array.prototype.forEach.call(main.querySelectorAll("tr.frow"), function (tr) {
       tr.addEventListener("click", function (e) {
         if (e.target.closest("a")) return;
@@ -235,8 +246,19 @@
 
     h += '<section class="section"><h2>핵심 결론 <span class="sub">눌러서 근거 보기</span></h2><div class="concl">';
     (OV.conclusions || []).forEach(function (c, i) {
+      var vs = (c.voices || []).filter(function (v) { var iv = byId(v.iv); return iv && list.indexOf(iv) >= 0; });
       h += '<details class="concl-item"><summary><span class="concl-no">' + (i + 1) + '</span><span class="concl-title">' + esc(c.title) + "</span>" +
-        (c.evidence ? '<span class="concl-ev">' + esc(c.evidence) + "</span>" : "") + "</summary><p>" + esc(c.detail || "") + "</p></details>";
+        (c.evidence ? '<span class="concl-ev">' + esc(c.evidence) + "</span>" : "") +
+        (vs.length ? '<span class="concl-vc">발언 ' + vs.length + "</span>" : "") + "</summary>" +
+        '<div class="concl-body"><p>' + esc(c.detail || "") + "</p>" +
+        (vs.length ? '<div class="voices"><div class="voices-label">테스터 발언</div>' + vs.map(function (v) {
+          var iv = byId(v.iv);
+          return '<div class="voice"><div class="voice-head"><a class="voice-who" href="#/i/' + esc(iv.id) + '">' + esc(iv.name) + "</a>" +
+            (iv.type === "리허설" ? '<span class="badge rehearsal">리허설</span>' : "") +
+            (v.about ? '<span class="voice-about">' + esc(v.about) + "</span>" : "") +
+            '<a class="voice-link" href="' + trLink(iv.id) + '" data-iv="' + esc(iv.id) + '" data-find="' + esc(v.find || "") + '">원문 →</a></div>' +
+            '<div class="voice-text">“' + esc(v.text) + "”</div></div>";
+        }).join("") + "</div>" : "") + "</div></details>";
     });
     h += "</div></section>";
 

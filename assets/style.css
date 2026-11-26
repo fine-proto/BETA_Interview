@@ -480,3 +480,19 @@ td .rating b { font-size: 15px; }
 }
 .ftable tr[hidden] { display: none !important; }
 @media (max-width: 760px) { .ov-hero .toggle { margin-bottom: 10px; } }
+
+/* ---------- 핵심 결론 근거(테스터 발언) ---------- */
+.concl-vc { font-size: 12px; font-weight: 700; color: var(--text-2); background: var(--bg); border: 1px solid var(--line); padding: 2px 8px; border-radius: 6px; white-space: nowrap; }
+.concl-body { padding: 0 18px 16px 56px; }
+.concl-body > p { margin: 0 0 12px; padding: 0; font-size: 14px; color: var(--text-2); }
+.voices { border-top: 1px dashed var(--line); padding-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+.voices-label { font-size: 12px; font-weight: 700; color: var(--text-3); }
+.voice { background: var(--bg); border-left: 3px solid var(--brand); border-radius: 6px; padding: 9px 12px; }
+.voice-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 3px; }
+.voice-who { font-weight: 800; font-size: 13.5px; color: var(--text); }
+.voice-who:hover { color: var(--brand); }
+.voice-about { font-size: 12px; color: var(--text-3); }
+.voice-about::before { content: "· "; }
+.voice-link { margin-left: auto; font-size: 12px; font-weight: 700; color: var(--brand); }
+.voice-text { font-size: 14px; color: var(--text); }
+@media (max-width: 760px) { .concl-body { padding-left: 18px; } .concl-item > summary { flex-wrap: wrap; } }

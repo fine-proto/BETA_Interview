@@ -45,7 +45,7 @@ tools/build_surveys.py     사전 설문 xlsx (+ --post 인터뷰 후 설문 xls
    - 생성 시 닉네임은 빠지고 나이는 연령대, 지역은 시·군·구까지만 남습니다. 인터뷰 전 테스터의 응답은 절대 저장소에 넣지 않습니다.
    - 인터뷰 후 설문은 메인 '인터뷰 후 설문' 섹션(사용 의향·빈도·기능 관심도 사전 대비 변화)에 자동 집계됩니다. 필요하면 overview.js findings 문구도 갱신합니다.
 5. `data/overview.js` 갱신:
-   - `OVERVIEW`: `updated`, `scope`, `summary`, `conclusions`(핵심 결론 3~5개, 근거 칩), `decisions`(결정 필요 Top 3), `findings`(근거 수치 포함), `userTypes.members`, `opportunities`, `betaChecks`
+   - `OVERVIEW`: `updated`, `scope`, `summary`, `conclusions`(핵심 결론 3~5개, 근거 칩, `voices`: 근거가 되는 테스터 발언 `{ iv, about, text, find }` — text는 원문 그대로 짧게, 생략은 '…', find는 원문에 있는 고유 문구), `decisions`(결정 필요 Top 3), `findings`(근거 수치 포함), `userTypes.members`, `opportunities`, `betaChecks`
    - `VERDICTS`: 기능별 판정 배지(keep 유지 / improve 개선 / review 재검토) + 한 줄 결론 + 근거. 인터뷰가 늘면 근거 수치와 판정을 다시 검토합니다.
    기능별 반응 분포·써본 뒤 관심도·통계·기준선 표는 interviews.js·surveys.js에서 자동 계산되므로 손댈 필요 없습니다.
 
