@@ -134,30 +134,174 @@
     document.getElementById("navOverview").classList.toggle("active", !!overviewActive);
   }
 
-  // ---------- overview ----------
-  function renderOverview() {
-    var list = sorted();
-    var mainCount = list.filter(function (i) { return i.type !== "리허설"; }).length;
-    var dates = list.map(function (i) { return i.date; });
-    var period = dates.length ? fmtDate(dates[0]).slice(0, 10) + (dates[0] !== dates[dates.length - 1] ? " ~ " + fmtDate(dates[dates.length - 1]).slice(5, 10) : "") : "-";
-    var mins = list.map(function (i) { var m = /(\d+)/.exec(i.duration || ""); return m ? +m[1] : null; }).filter(function (x) { return x; });
-    var avg = mins.length ? Math.round(mins.reduce(function (a, b) { return a + b; }, 0) / mins.length) : null;
+  // ---------- overview (탭: 요약 / 기능별 분석 / 사용자 유형·설문 / 참고 자료) ----------
+  var BADGE = { keep: "유지", improve: "개선", review: "재검토" };
+  var OV_TABS = [["summary", "요약"], ["features", "기능별 분석"], ["types", "사용자 유형·설문"], ["ref", "참고 자료"]];
+  var onlyMain = false;
+  try { onlyMain = localStorage.getItem("ovOnlyMain") === "1"; } catch (e) {}
 
+  function badge(k) { return k ? '<span class="vbadge ' + k + '">' + BADGE[k] + "</span>" : ""; }
+  function ovList() {
+    var l = sorted();
+    return onlyMain ? l.filter(function (i) { return i.type !== "리허설"; }) : l;
+  }
+  function postInterestByFeature(list) {
+    // { featureKey: [{menu, avg, n, up, down}] }
+    var MAP = window.SURVEY_MENU_MAP || {}, POSTS = window.POST_SURVEYS || {}, PRES = window.SURVEYS || {};
+    var acc = {};
+    list.forEach(function (iv) {
+      var P = POSTS[iv.id]; if (!P) return;
+      var pre = {};
+      (PRES[iv.id] ? PRES[iv.id].interest : []).forEach(function (c) { pre[shortMenu(c.name)] = c.level; });
+      (P.interest || []).forEach(function (it) {
+        var m = shortMenu(it.name), a = lvScore(it.level), b = lvScore(pre[m]);
+        if (!a) return;
+        acc[m] = acc[m] || { menu: m, sum: 0, n: 0, up: 0, down: 0 };
+        acc[m].sum += a; acc[m].n++;
+        if (b) { if (a > b) acc[m].up++; else if (a < b) acc[m].down++; }
+      });
+    });
+    var out = {};
+    Object.keys(acc).forEach(function (m) {
+      (MAP[m] || []).forEach(function (k) { (out[k] = out[k] || []).push({ menu: m, avg: acc[m].sum / acc[m].n, n: acc[m].n, up: acc[m].up, down: acc[m].down }); });
+    });
+    return out;
+  }
+  function interestCell(arr) {
+    if (!arr || !arr.length) return '<span class="muted">-</span>';
+    return arr.map(function (x) {
+      return '<div class="pi"><b>' + (Math.round(x.avg * 10) / 10) + '</b><span class="muted">/5</span>' +
+        (arr.length > 1 || x.menu ? ' <span class="pi-menu">' + esc(x.menu) + "</span>" : "") +
+        (x.up ? ' <span class="int-delta up">▲' + x.up + "</span>" : "") + (x.down ? ' <span class="int-delta down">▼' + x.down + "</span>" : "") + "</div>";
+    }).join("");
+  }
+  function sentiDist(list, key) {
+    var cnt = { pos: 0, mix: 0, neu: 0, neg: 0 }, total = 0;
+    list.forEach(function (iv) { var f = featOf(iv, key), k = f ? f.sentiment : "na"; if (cnt[k] != null) { cnt[k]++; total++; } });
+    var bar = '<div class="dist">' + ["pos", "mix", "neu", "neg"].map(function (k) {
+      return cnt[k] ? '<span class="' + k + '" style="width:' + (cnt[k] / total * 100) + '%"></span>' : "";
+    }).join("") + "</div>";
+    var txt = ["pos", "mix", "neu", "neg"].filter(function (k) { return cnt[k]; }).map(function (k) { return SENTI[k] + " " + cnt[k]; }).join(" · ");
+    return bar + '<div class="dist-txt">' + (txt || "응답 없음") + "</div>";
+  }
+
+  function renderOverview(params) {
+    var tab = params && params.tab;
+    if (!OV_TABS.some(function (t) { return t[0] === tab; })) tab = "summary";
+    var list = ovList(), all = sorted();
+    var mainCount = all.filter(function (i) { return i.type !== "리허설"; }).length;
+
+    var h = '<section class="card hero ov-hero"><div class="detail-head"><div><div class="eyebrow">전체 요약 분석</div><h1>사전 인터뷰 종합</h1>' +
+      '<div class="meta-row"><span><b>인터뷰</b> ' + all.length + "명 (본 인터뷰 " + mainCount + " · 리허설 " + (all.length - mainCount) + ")</span>" +
+      (OV.updated ? "<span><b>최종 반영</b> " + esc(OV.updated) + "</span>" : "") + "</div></div>" +
+      '<label class="toggle"><input type="checkbox" id="onlyMain"' + (onlyMain ? " checked" : "") + '><span class="tg"></span>본 인터뷰만 보기</label></div>' +
+      '<p class="lead">' + esc(OV.summary || "") + "</p></section>";
+    h += '<div class="tabs ov-tabs" role="tablist">' + OV_TABS.map(function (t) {
+      return '<a role="tab" class="tab' + (t[0] === tab ? " on" : "") + '" href="#/?tab=' + t[0] + '">' + t[1] + "</a>";
+    }).join("") + "</div>";
+    if (onlyMain) h += '<div class="note" style="margin:0 0 14px">리허설 ' + (all.length - mainCount) + "건을 빼고 집계한 화면입니다. 핵심 결론·판정 문구는 전체 인터뷰 기준입니다.</div>";
+
+    if (tab === "summary") h += ovSummary(list);
+    else if (tab === "features") h += ovFeatures(list);
+    else if (tab === "types") h += ovTypes(list);
+    else h += ovRef(list);
+
+    main.innerHTML = h;
+    document.getElementById("onlyMain").addEventListener("change", function () {
+      onlyMain = this.checked;
+      try { localStorage.setItem("ovOnlyMain", onlyMain ? "1" : "0"); } catch (e) {}
+      renderOverview({ tab: tab });
+    });
+    Array.prototype.forEach.call(main.querySelectorAll("tr.frow"), function (tr) {
+      tr.addEventListener("click", function (e) {
+        if (e.target.closest("a")) return;
+        var d = tr.nextElementSibling; var open = d.hidden;
+        d.hidden = !open; tr.classList.toggle("open", open);
+      });
+    });
+  }
+
+  function ovSummary(list) {
+    var POSTS = window.POST_SURVEYS || {}, V = window.VERDICTS || {};
+    var posts = list.filter(function (iv) { return POSTS[iv.id]; });
+    var ratings = posts.map(function (iv) { return parseFloat(POSTS[iv.id].rating); }).filter(function (n) { return !isNaN(n); });
+    var avg = ratings.length ? Math.round(ratings.reduce(function (a, b) { return a + b; }, 0) / ratings.length * 10) / 10 : "-";
+    var ok = posts.filter(function (iv) { return /괜찮/.test(POSTS[iv.id].privacy || ""); }).length;
+    var mc = list.filter(function (i) { return i.type !== "리허설"; }).length;
+    var h = '<div class="stats" style="grid-template-columns:repeat(3,1fr);margin-top:0">' +
+      stat("인터뷰", list.length + "명", "본 인터뷰 " + mc + " · 리허설 " + (list.length - mc)) +
+      stat("써본 뒤 사용 의향", avg + " / 5", "인터뷰 직후 설문 " + posts.length + "명 평균") +
+      stat("위치 포함 주행 기록 전송", ok + " / " + posts.length + "명", "'기능 쓰려면 괜찮다'") + "</div>";
+
+    h += '<section class="section"><h2>핵심 결론 <span class="sub">눌러서 근거 보기</span></h2><div class="concl">';
+    (OV.conclusions || []).forEach(function (c, i) {
+      h += '<details class="concl-item"><summary><span class="concl-no">' + (i + 1) + '</span><span class="concl-title">' + esc(c.title) + "</span>" +
+        (c.evidence ? '<span class="concl-ev">' + esc(c.evidence) + "</span>" : "") + "</summary><p>" + esc(c.detail || "") + "</p></details>";
+    });
+    h += "</div></section>";
+
+    // 판정 요약
+    var groups = { keep: [], improve: [], review: [] };
+    FEATURES.forEach(function (F) { var v = V[F.key]; if (v && groups[v.badge]) groups[v.badge].push(F); });
+    h += '<section class="section"><h2>기능 판정 <span class="sub">자세한 근거는 \'기능별 분석\' 탭</span></h2><div class="vsum">';
+    ["keep", "improve", "review"].forEach(function (k) {
+      h += '<div class="vsum-col ' + k + '"><div class="vsum-head">' + badge(k) + ' <b>' + groups[k].length + "</b></div>" +
+        groups[k].map(function (F) { return '<a class="vsum-item" href="#/?tab=features">' + esc(F.name) + '<span class="muted">' + esc((V[F.key] || {}).line || "") + "</span></a>"; }).join("") + "</div>";
+    });
+    h += "</div></section>";
+
+    if ((OV.decisions || []).length) {
+      h += '<section class="section"><h2>지금 결정이 필요한 것</h2><div class="decisions">' +
+        OV.decisions.map(function (d, i) { return '<div class="decision"><div class="decision-no">' + (i + 1) + "</div><div><h3>" + esc(d.title) + "</h3><p>" + esc(d.why) + "</p></div></div>"; }).join("") +
+        "</div></section>";
+    }
+    return h;
+  }
+
+  function ovFeatures(list) {
+    var V = window.VERDICTS || {}, PI = postInterestByFeature(list);
+    var order = { keep: 0, improve: 1, review: 2 };
+    var rank = function (k) { var b = (V[k] || {}).badge; return b in order ? order[b] : 9; };
+    var feats = FEATURES.slice().sort(function (a, b) { return rank(a.key) - rank(b.key); });
+    var h = '<div class="legend">' + ["pos", "mix", "neu", "neg"].map(senti).join("") +
+      '<span class="muted" style="margin-left:6px">행을 누르면 판정 근거와 테스터별 반응이 펼쳐집니다.</span></div>';
+    h += '<div class="table-wrap"><table class="ftable"><thead><tr><th>기능</th><th>판정</th><th>한 줄 결론</th><th>인터뷰 반응 (' + list.length + '명)</th><th>써본 뒤 관심도</th></tr></thead><tbody>';
+    feats.forEach(function (F) {
+      var v = V[F.key] || {};
+      h += '<tr class="frow"><td class="rowhead">' + esc(F.name) + ' <span class="caret">▾</span></td><td>' + badge(v.badge) + "</td><td>" + esc(v.line || "") + "</td><td>" + sentiDist(list, F.key) + "</td><td>" + interestCell(PI[F.key]) + "</td></tr>";
+      h += '<tr class="fdetail" hidden><td colspan="5">' +
+        (v.why ? '<div class="why"><b>판정 근거</b> ' + esc(v.why) + "</div>" : "") +
+        '<div class="who-grid">' + list.map(function (iv) {
+          var f = featOf(iv, F.key);
+          return '<div class="who"><div class="who-head"><a href="#/i/' + esc(iv.id) + '">' + esc(iv.name) + "</a> " + senti(f ? f.sentiment : "na") + "</div>" +
+            "<p>" + esc(f ? f.reaction : "응답 없음") + "</p>" + (f && f.suggestion ? '<p class="sugg">제안 · ' + esc(f.suggestion) + "</p>" : "") + "</div>";
+        }).join("") + "</div></td></tr>";
+    });
+    h += "</tbody></table></div>";
+    h += '<p class="muted" style="font-size:12px;margin:8px 2px 0">써본 뒤 관심도: 인터뷰 직후 설문의 \'먼저 써보고 싶은 기능\' 평균(5점). ▲▼는 사전 설문보다 오르거나 내린 사람 수입니다.</p>';
+    return h;
+  }
+
+  function ovTypes(list) {
     var h = "";
-    h += '<section class="card hero"><div class="eyebrow">전체 요약 분석</div>' +
-      "<h1>사전 인터뷰 종합</h1>" +
-      '<p class="lead">' + esc(OV.summary || "") + "</p>" +
-      (OV.scope ? '<div class="note">' + esc(OV.scope) + "</div>" : "") + "</section>";
+    if (OV.userTypes && OV.userTypes.length) {
+      h += '<section class="section" style="margin-top:0"><h2>사용자 유형 <span class="sub">잠정 분류</span></h2><div class="types">';
+      OV.userTypes.forEach(function (t) {
+        var mem = (t.members || []).filter(function (id) { return list.some(function (iv) { return iv.id === id; }); });
+        h += '<div class="type' + (mem.length ? "" : " dim") + '"><h3>' + esc(t.name) + "</h3><p>" + esc(t.desc) + "</p>" +
+          (t.needs ? '<div class="needs"><b>필요한 것</b> · ' + esc(t.needs) + "</div>" : "") +
+          '<div class="members">' + mem.map(function (id) { var iv = byId(id); return '<a class="member" href="#/i/' + esc(id) + '">' + esc(iv.name) + "</a>"; }).join("") + "</div></div>";
+      });
+      h += "</div></section>";
+    }
+    h += renderPostOverview(list);
+    return h;
+  }
 
-    h += '<div class="stats">' +
-      stat("인터뷰", IV.length + "명", "본 인터뷰 " + mainCount + " · 리허설 " + (IV.length - mainCount)) +
-      stat("진행 기간", period, (new Set(dates)).size + "일") +
-      stat("평균 소요", avg ? "약 " + avg + "분" : "-", "1:1 대면") +
-      stat("마지막 반영", OV.updated ? fmtDate(OV.updated).slice(0, 10) : "-", "요약·분석 기준일") +
-      "</div>";
-
+  function ovRef(list) {
+    var h = "";
     if (OV.findings && OV.findings.length) {
-      h += '<section class="section"><h2>핵심 발견</h2><div class="findings">';
+      h += '<section class="section" style="margin-top:0"><h2>핵심 발견 전문</h2><div class="findings">';
       OV.findings.forEach(function (f, i) {
         h += '<div class="finding"><div class="finding-no">' + String(i + 1).padStart(2, "0") + "</div>" +
           "<h3>" + esc(f.title) + "</h3><p>" + esc(f.body) + "</p>" +
@@ -165,65 +309,23 @@
       });
       h += "</div></section>";
     }
-
-    h += '<section class="section"><h2>기능별 반응 <span class="sub">인터뷰 데이터에서 자동 집계</span></h2>' +
-      '<div class="legend">' + ["pos", "mix", "neu", "neg", "na"].map(senti).join("") + "</div>" +
-      '<div class="table-wrap"><table class="matrix"><thead><tr><th class="rowhead">기능</th>';
-    list.forEach(function (iv) {
-      h += '<th class="col"><a href="#/i/' + esc(iv.id) + '">' + esc(iv.name) + '</a><div class="muted" style="font-weight:500">' + esc(iv.type) + "</div></th>";
-    });
-    h += "<th>분포</th></tr></thead><tbody>";
-    FEATURES.forEach(function (F) {
-      var cnt = { pos: 0, mix: 0, neu: 0, neg: 0 }, total = 0;
-      h += '<tr><td class="rowhead">' + esc(F.name) + "</td>";
-      list.forEach(function (iv) {
-        var f = featOf(iv, F.key), k = f ? f.sentiment : "na";
-        if (cnt[k] != null) { cnt[k]++; total++; }
-        h += '<td title="' + esc(f ? f.reaction : "") + '">' + senti(k) + "</td>";
-      });
-      h += '<td><div class="dist">';
-      ["pos", "mix", "neu", "neg"].forEach(function (k) {
-        if (cnt[k]) h += '<span class="' + k + '" style="width:' + (cnt[k] / total * 100) + '%"></span>';
-      });
-      h += "</div></td></tr>";
-    });
-    h += '</tbody></table></div><p class="muted" style="font-size:12px;margin:8px 2px 0">칸에 마우스를 올리면 해당 테스터의 반응 요약이 보입니다.</p></section>';
-
-    h += renderPostOverview(list);
-
-    if (OV.userTypes && OV.userTypes.length) {
-      h += '<section class="section"><h2>사용자 유형 <span class="sub">잠정 분류</span></h2><div class="types">';
-      OV.userTypes.forEach(function (t) {
-        h += '<div class="type"><h3>' + esc(t.name) + "</h3><p>" + esc(t.desc) + "</p>" +
-          (t.needs ? '<div class="needs"><b>필요한 것</b> · ' + esc(t.needs) + "</div>" : "") +
-          '<div class="members">' + (t.members || []).map(function (id) {
-            var iv = byId(id); return iv ? '<a class="member" href="#/i/' + esc(id) + '">' + esc(iv.name) + "</a>" : "";
-          }).join("") + "</div></div>";
-      });
-      h += "</div></section>";
-    }
-
     h += '<section class="section two-col">';
     h += '<div class="card"><h2>기획 반영 후보</h2><ol class="list">' + (OV.opportunities || []).map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + "</ol></div>";
     h += '<div class="card"><h2>베타테스트에서 확인할 것</h2><ol class="list">' + (OV.betaChecks || []).map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + "</ol></div>";
     h += "</section>";
-
     h += '<section class="section"><h2>사전 사용자 경험 기준선 (Baseline) <span class="sub">베타 결과와 비교할 고정 항목</span></h2>' +
       '<div class="table-wrap"><table><thead><tr><th class="rowhead">항목</th>';
     list.forEach(function (iv) { h += "<th>" + esc(iv.name) + "</th>"; });
     h += "</tr></thead><tbody>";
     BASE.forEach(function (b) {
       h += '<tr><td class="rowhead">' + esc(b.name) + "</td>";
-      list.forEach(function (iv) {
-        var v = (iv.baseline || {})[b.key];
-        h += "<td>" + (v ? esc(v) : '<span class="muted">미확인</span>') + "</td>";
-      });
+      list.forEach(function (iv) { var v = (iv.baseline || {})[b.key]; h += "<td>" + (v ? esc(v) : '<span class="muted">미확인</span>') + "</td>"; });
       h += "</tr>";
     });
     h += "</tbody></table></div></section>";
-
-    main.innerHTML = h;
+    return h;
   }
+
   function renderPostOverview(list) {
     var POSTS = window.POST_SURVEYS || {}, PRES = window.SURVEYS || {};
     var LS = { "매우 관심있음": 5, "관심있음": 4, "필요함": 4, "보통": 3, "관심없음": 2, "필요 없음": 2, "전혀 관심없음": 1 };
@@ -769,6 +871,9 @@
         if (v[p[0]]) recs.push({ iv: iv, kind: "verdict", label: "종합 평가 · " + p[1], text: v[p[0]] });
       });
     });
+    (OV.conclusions || []).forEach(function (c) { recs.push({ iv: null, kind: "overview", label: "핵심 결론", text: c.title + " — " + c.detail }); });
+    var VV = window.VERDICTS || {};
+    Object.keys(VV).forEach(function (k) { recs.push({ iv: null, kind: "overview", label: "판정 · " + featName(k) + " (" + BADGE[VV[k].badge] + ")", text: VV[k].line + " — " + VV[k].why }); });
     (OV.findings || []).forEach(function (f) { recs.push({ iv: null, kind: "overview", label: "핵심 발견", text: f.title + " — " + f.body }); });
     (OV.opportunities || []).forEach(function (x) { recs.push({ iv: null, kind: "opportunity", label: "기획 반영 후보", text: x }); });
     (OV.betaChecks || []).forEach(function (x) { recs.push({ iv: null, kind: "betacheck", label: "베타에서 확인할 것", text: x }); });
@@ -972,7 +1077,7 @@
     } else {
       renderNav(null, true);
       document.title = "FINE Alaseo 베타 사전 인터뷰";
-      renderOverview();
+      renderOverview(H.params);
     }
     if (!(m && m[2] && H.params.at)) window.scrollTo(0, 0);
   }

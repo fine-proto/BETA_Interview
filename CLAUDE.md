@@ -9,7 +9,7 @@ index.html                 화면 뼈대 (수정할 일 거의 없음)
 assets/style.css           스타일
 assets/app.js              렌더링·라우팅 (#/ 전체요약, #/i/<id> 요약, #/i/<id>/transcript 원문, #/search?q= 검색), Word 내려받기 내용 구성
 assets/docx.js             의존성 없는 .docx 생성기 (인터뷰별 '내려받기' 버튼에서 사용)
-data/overview.js           메인 '전체 요약 분석' 내용 + FEATURES(기능 목록) + BASELINE_KEYS(기준선 항목)
+data/overview.js           메인 '전체 요약 분석' 내용(OVERVIEW: conclusions·decisions·findings 등) + FEATURES + VERDICTS(기능 판정) + SURVEY_MENU_MAP + BASELINE_KEYS
 data/interviews.js         인터뷰별 요약 데이터 (배열, 1명 = 객체 1개)
 data/transcripts/<id>.js   비식별 처리된 원문 (tools/build_transcripts.py 로 생성)
 data/surveys.js            인터뷰를 마친 테스터의 사전 설문(SURVEYS)·인터뷰 직후 설문(POST_SURVEYS) (tools/build_surveys.py 로 생성)
@@ -44,8 +44,14 @@ tools/build_surveys.py     사전 설문 xlsx (+ --post 인터뷰 후 설문 xls
    - 응답자가 누구인지 불확실하면 추정해서 연결하지 말고 사용자에게 확인합니다.
    - 생성 시 닉네임은 빠지고 나이는 연령대, 지역은 시·군·구까지만 남습니다. 인터뷰 전 테스터의 응답은 절대 저장소에 넣지 않습니다.
    - 인터뷰 후 설문은 메인 '인터뷰 후 설문' 섹션(사용 의향·빈도·기능 관심도 사전 대비 변화)에 자동 집계됩니다. 필요하면 overview.js findings 문구도 갱신합니다.
-5. `data/overview.js` 의 `OVERVIEW` 갱신: `updated`, `scope`, `summary`, `findings`(근거 수치 포함), `userTypes.members`, `opportunities`, `betaChecks`.
-   기능별 반응 매트릭스·통계·기준선 표는 interviews.js에서 자동 계산되므로 손댈 필요 없습니다.
+5. `data/overview.js` 갱신:
+   - `OVERVIEW`: `updated`, `scope`, `summary`, `conclusions`(핵심 결론 3~5개, 근거 칩), `decisions`(결정 필요 Top 3), `findings`(근거 수치 포함), `userTypes.members`, `opportunities`, `betaChecks`
+   - `VERDICTS`: 기능별 판정 배지(keep 유지 / improve 개선 / review 재검토) + 한 줄 결론 + 근거. 인터뷰가 늘면 근거 수치와 판정을 다시 검토합니다.
+   기능별 반응 분포·써본 뒤 관심도·통계·기준선 표는 interviews.js·surveys.js에서 자동 계산되므로 손댈 필요 없습니다.
+
+## 전체 요약 화면 구성 (탭)
+요약(숫자 3개·핵심 결론·기능 판정·결정 필요) / 기능별 분석(판정·한 줄 결론·반응 분포·써본 뒤 관심도, 행을 누르면 근거와 테스터별 반응) / 사용자 유형·설문 / 참고 자료(핵심 발견 전문·기획 반영 후보·베타 확인·기준선).
+상단 '본 인터뷰만 보기' 토글(기본 꺼짐)은 리허설을 빼고 자동 집계 부분만 다시 계산합니다.
 6. 로컬 확인 후 커밋·푸시 (main).
 
 ## 인터뷰 요약 화면 구성 (순서 유지)
