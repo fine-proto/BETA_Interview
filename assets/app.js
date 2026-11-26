@@ -13,6 +13,7 @@
   var SENTI = { pos: "긍정", mix: "조건부", neu: "중립", neg: "부정", na: "미확인" };
   var DAYS = ["일", "월", "화", "수", "목", "금", "토"];
   var MOD = "진행자";
+  var SEC = "구분"; // 원문의 섹션 제목·메모 행
 
   // ---------- helpers ----------
   function esc(s) {
@@ -636,6 +637,7 @@
         B.push({ t: "h1", text: "부록 · 인터뷰 원문" });
         B.push({ t: "small", text: "녹취 자동 변환본입니다. 인식 오류가 있을 수 있고, 진행자는 '진행자', 그 외 실명은 성+OO로 표기했습니다." });
         turns.forEach(function (t) {
+          if (t.s === SEC) { B.push({ t: "h2", text: t.x }); return; }
           B.push({ t: "p", runs: [{ text: (t.s || "-") + "  ", b: true, color: t.s === MOD ? "667085" : "1F4FD8" }, { text: t.t, color: "98A2B3", size: 17 }, { text: "\n" + t.x, color: t.s === MOD ? "4A5468" : "1D2433" }] });
         });
       }
@@ -677,7 +679,7 @@
       if (!turns) { box.innerHTML = '<div class="empty">원문 파일이 아직 없습니다.</div>'; return; }
 
       var speakers = [];
-      turns.forEach(function (t) { if (t.s && speakers.indexOf(t.s) < 0) speakers.push(t.s); });
+      turns.forEach(function (t) { if (t.s && t.s !== SEC && speakers.indexOf(t.s) < 0) speakers.push(t.s); });
       var activeSp = "";
       document.getElementById("trFilter").innerHTML = ['<button class="on" data-sp="">전체</button>']
         .concat(speakers.map(function (s) { return '<button data-sp="' + esc(s) + '">' + esc(s) + "</button>"; })).join("");
@@ -693,6 +695,10 @@
             if (!c) visible = false; else hits += c;
           }
           if (visible) shown++;
+          if (t.s === SEC) {
+            html += '<div class="turn-sec' + ((nq || activeSp) ? " hide" : "") + '">' + esc(t.x) + "</div>";
+            return;
+          }
           var focus = at && t.t === at && !nq;
           html += '<div class="turn ' + roleOf(t.s, iv) + (visible ? "" : " hide") + (focus ? " focus" : "") + '" data-i="' + i + '"><div class="turn-who">' + esc(t.s || "-") +
             '<span class="turn-time">' + esc(t.t) + '</span></div><div class="turn-text">' + hlText(t.x, nq ? [q] : (focus && hl ? [hl] : [])) + "</div></div>";
@@ -828,7 +834,7 @@
         }
         var inTopic = topicLeft > 0;
         if (topicLeft > 0) topicLeft--;
-        if (nx.length < 12) return;
+        if (t.s === SEC || nx.length < 12) return;
         var prev = prevModTurn(turns, i);
         var s = 0;
         if (coreKeys.length) {

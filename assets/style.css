@@ -399,3 +399,5 @@ td .rating b { font-size: 15px; }
 .int-bar i.on.s1 { background: #f0b7b3; }
 .int-level.s5 { color: var(--brand); } .int-level.s4 { color: #4a72e0; } .int-level.s3 { color: var(--text-3); } .int-level.s2 { color: var(--na); } .int-level.s1 { color: var(--neg); }
 @media (max-width: 760px) { .post-tiles { grid-template-columns: 1fr; } }
+.turn-sec { padding: 14px 22px 6px; font-size: 13px; font-weight: 800; color: var(--brand); border-bottom: 1px solid #f0f2f5; background: #fafbff; }
+.turn-sec.hide { display: none; }
