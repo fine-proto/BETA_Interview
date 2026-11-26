@@ -5,6 +5,8 @@
   var OV = window.OVERVIEW || {};
   var FEATURES = window.FEATURES || [];
   var BASE = window.BASELINE_KEYS || [];
+  var SURVEYS = window.SURVEYS || {};
+  var LEVELS = window.SURVEY_LEVELS || ["매우 관심있음", "관심있음", "보통", "관심없음", "전혀 관심없음"];
   var TRANSCRIPTS = {};
   var main = document.getElementById("main");
 
@@ -265,7 +267,7 @@
     // section nav
     var secs = [["sec-insight", "핵심 인사이트", (iv.insights || []).length], ["sec-quote", "인상적인 발언", (iv.quotes || []).length],
       ["sec-feature", "기능별 반응", (iv.features || []).length], ["sec-verdict", "종합 평가", VERDICT_FIELDS.some(function (p) { return v[p[0]]; })],
-      ["sec-profile", "프로필", (iv.profile || []).length], ["sec-baseline", "기준선", !!iv.baseline]];
+      ["sec-profile", "프로필", (iv.profile || []).length], ["sec-survey", "사전 설문", true], ["sec-baseline", "기준선", !!iv.baseline]];
     h += '<nav class="secnav">' + secs.filter(function (s) { return s[2]; }).map(function (s) {
       return '<button type="button" data-go="' + s[0] + '">' + s[1] + "</button>";
     }).join("") + "</nav>";
@@ -323,7 +325,10 @@
       h += "</dl>" + (more ? '<button type="button" class="more-btn" data-more>프로필 전체 보기 (' + iv.profile.length + "개 항목) ▾</button>" : "") + "</div></section>";
     }
 
-    // 7. 기준선 (접기)
+    // 7. 사전 설문
+    h += renderSurvey(iv);
+
+    // 8. 기준선 (접기)
     if (iv.baseline) {
       h += '<section class="section" id="sec-baseline"><details class="fold"><summary><h2>기준선 (Baseline) <span class="sub">베타 결과와 비교할 항목 · 눌러서 펼치기</span></h2></summary><div class="card"><dl class="profile">';
       BASE.forEach(function (b) {
@@ -373,6 +378,42 @@
         });
       });
     }
+  }
+
+  // ---------- 사전 설문 ----------
+  function levelIdx(l) { var i = LEVELS.indexOf(l); return i < 0 ? -1 : i; }
+  function kvTable(rows) {
+    return '<dl class="profile kv">' + rows.map(function (r) {
+      return "<dt>" + esc(r[0]) + "</dt><dd>" + (r[1] ? esc(r[1]) : '<span class="muted">-</span>') + "</dd>";
+    }).join("") + "</dl>";
+  }
+  function renderSurvey(iv) {
+    var S = SURVEYS[iv.id];
+    var h = '<section class="section" id="sec-survey"><h2>사전 설문 <span class="sub">' +
+      (S ? "인터뷰 전 온라인 응답 · " + esc(S.submitted) + " 제출" : "") + "</span></h2>";
+    if (!S) return h + '<div class="card muted">이 테스터의 사전 설문 응답이 없습니다.</div></section>';
+    h += '<div class="survey-grid">';
+    // 첫인상
+    h += '<div class="card"><h3>앱 첫인상</h3>' +
+      (S.service ? '<p class="survey-service">“' + esc(S.service) + '”</p><div class="muted" style="font-size:12px;margin:-4px 0 10px">어떤 서비스를 제공하는 앱으로 보이나요?</div>' : "") +
+      ((S.words || []).length ? '<div class="glance-label">첫인상 단어</div><div style="margin-bottom:12px">' + S.words.map(function (w) { return '<span class="tag">' + esc(w) + "</span>"; }).join("") + "</div>" : "") +
+      '<div class="glance-label">경험해 보고 싶은 메뉴</div><div class="interest">' +
+      (S.interest || []).map(function (it) {
+        var k = levelIdx(it.level);
+        return '<div class="int-row"><span class="int-name">' + esc(it.name) + '</span><span class="int-bar">' +
+          [0, 1, 2, 3, 4].map(function (n) { return '<i class="' + (k >= 0 && n >= k ? "on l" + k : "") + '"></i>'; }).reverse().join("") +
+          '</span><span class="int-level l' + k + '">' + esc(it.level || "-") + "</span></div>";
+      }).join("") + "</div>" +
+      (S.reason ? '<div class="glance-label" style="margin-top:12px">이렇게 고른 이유</div><p style="margin:0;font-size:14px">' + esc(S.reason) + "</p>" : "") +
+      "</div>";
+    // 응답 상세
+    h += '<div class="card"><h3>차량·주차</h3>' + kvTable(S.basic || []) +
+      '<h3 style="margin-top:16px">블랙박스</h3>' + kvTable(S.blackbox || []) +
+      '<h3 style="margin-top:16px">사고·신고</h3>' + kvTable(S.incident || []) +
+      (S.apps ? '<h3 style="margin-top:16px">사용 중인 차량 관련 앱</h3><p style="margin:0;font-size:14px">' + esc(S.apps) + "</p>" : "") +
+      "</div>";
+    h += "</div></section>";
+    return h;
   }
 
   // ---------- Word 내려받기 ----------
@@ -441,6 +482,27 @@
       if ((iv.profile || []).length) {
         B.push({ t: "h1", text: "테스터 프로필" });
         B.push({ t: "table", widths: [1, 3.5], rows: iv.profile.map(function (p) { return [{ runs: p.label, base: { b: true }, fill: "F6F7F9" }, p.text]; }) });
+      }
+
+      var S = SURVEYS[iv.id];
+      B.push({ t: "h1", text: "사전 설문" });
+      if (!S) B.push({ t: "small", text: "이 테스터의 사전 설문 응답이 없습니다." });
+      else {
+        B.push({ t: "small", text: "인터뷰 전 온라인 응답 · " + S.submitted + " 제출" });
+        B.push({ t: "h2", text: "앱 첫인상" });
+        B.push({ t: "table", widths: [1.3, 3], rows: [
+          [{ runs: "어떤 앱으로 보이나요", base: { b: true }, fill: "F6F7F9" }, S.service || "-"],
+          [{ runs: "첫인상 단어", base: { b: true }, fill: "F6F7F9" }, (S.words || []).join(", ") || "-"],
+          [{ runs: "선택 이유", base: { b: true }, fill: "F6F7F9" }, S.reason || "-"]
+        ] });
+        B.push({ t: "h2", text: "경험해 보고 싶은 메뉴" });
+        var LC = ["1F4FD8", "4A72E0", "667085", "98A2B3", "C4322B"];
+        B.push({ t: "table", header: true, widths: [3, 1.3], rows: [["메뉴", "관심도"]].concat((S.interest || []).map(function (it) {
+          var k = levelIdx(it.level); return [it.name, { runs: [{ text: it.level || "-", b: k <= 1 && k >= 0, color: LC[k] || "667085" }] }];
+        })) });
+        B.push({ t: "h2", text: "응답 상세" });
+        B.push({ t: "table", widths: [1.3, 3], rows: [].concat(S.basic || [], S.blackbox || [], S.incident || [], S.apps ? [["사용 중인 차량 관련 앱", S.apps]] : [])
+          .map(function (r) { return [{ runs: r[0], base: { b: true }, fill: "F6F7F9" }, r[1] || "-"]; }) });
       }
 
       if (iv.baseline) {

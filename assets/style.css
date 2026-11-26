@@ -351,3 +351,22 @@ details.fold[open] > summary h2::after { content: "▴"; }
   .secnav { overflow-x: auto; flex-wrap: nowrap; }
   .secnav button { flex-shrink: 0; }
 }
+
+/* ---------- 사전 설문 ---------- */
+.survey-grid { display: grid; grid-template-columns: 1.1fr 1fr; gap: 12px; align-items: start; }
+.survey-grid h3 { font-size: 14px; color: var(--text); margin-bottom: 8px; }
+.survey-service { margin: 0 0 8px; font-size: 15px; font-weight: 600; }
+.interest { display: flex; flex-direction: column; gap: 6px; }
+.int-row { display: grid; grid-template-columns: 1fr 70px 92px; align-items: center; gap: 10px; font-size: 13px; }
+.int-name { color: var(--text); }
+.int-bar { display: flex; gap: 3px; }
+.int-bar i { flex: 1; height: 8px; border-radius: 2px; background: #eceef2; }
+.int-bar i.on.l0 { background: var(--brand); }
+.int-bar i.on.l1 { background: #6b8ff0; }
+.int-bar i.on.l2 { background: #aeb6c6; }
+.int-bar i.on.l3 { background: #d3d8e0; }
+.int-level { font-size: 12px; font-weight: 700; color: var(--text-3); }
+.int-level.l0 { color: var(--brand); } .int-level.l1 { color: #4a72e0; } .int-level.l4 { color: var(--neg); }
+dl.kv { grid-template-columns: 120px 1fr; }
+dl.kv dt, dl.kv dd { padding: 7px 0; font-size: 13px; }
+@media (max-width: 1000px) { .survey-grid { grid-template-columns: 1fr; } }

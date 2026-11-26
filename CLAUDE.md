@@ -12,7 +12,9 @@ assets/docx.js             의존성 없는 .docx 생성기 (인터뷰별 '내�
 data/overview.js           메인 '전체 요약 분석' 내용 + FEATURES(기능 목록) + BASELINE_KEYS(기준선 항목)
 data/interviews.js         인터뷰별 요약 데이터 (배열, 1명 = 객체 1개)
 data/transcripts/<id>.js   비식별 처리된 원문 (tools/build_transcripts.py 로 생성)
+data/surveys.js            인터뷰를 마친 테스터의 사전 설문 (tools/build_surveys.py 로 생성)
 tools/build_transcripts.py 원문 txt → 비식별 JS 변환 스크립트
+tools/build_surveys.py     사전 설문 xlsx/csv → data/surveys.js (닉네임↔id 매핑한 사람만 포함)
 ```
 
 ## 인터뷰 추가 절차 (사용자가 새 인터뷰를 올리고 요약·분석을 요청할 때마다)
@@ -29,12 +31,19 @@ tools/build_transcripts.py 원문 txt → 비식별 JS 변환 스크립트
    - `profile`, `features`(FEATURES의 key 사용, sentiment: pos/mix/neu/neg/na), `verdict`, `insights`, `quotes`, `baseline`(BASELINE_KEYS의 key)
    - `quotes`는 `{ topic, text, find }` 형식. topic = 무엇에 대한 발언인지('기능 · 맥락'), find = 원문(data/transcripts)에 그대로 있는 고유 문구.
      요약 화면에서 커서를 올리면 find로 원문을 찾아 진행자 질문 + 해당 발화를 보여주므로, 추가 후 find가 원문에서 찾아지는지 확인합니다.
-4. `data/overview.js` 의 `OVERVIEW` 갱신: `updated`, `scope`, `summary`, `findings`(근거 수치 포함), `userTypes.members`, `opportunities`, `betaChecks`.
+4. 사전 설문 반영: 원본 응답은 **공개 저장소가 아니라 claude.ai 프로젝트 문서 `claude/사전설문_원본_응답.csv`** 에 보관합니다(인터뷰 전 테스터 포함).
+   인터뷰를 마친 테스터가 생기면 그 문서를 받아 `--map "닉네임=id"` 를 기존 매핑과 함께 모두 넘겨 다시 생성합니다.
+   ```
+   python3 tools/build_surveys.py 사전설문.xlsx data/surveys.js --map "<닉네임>=i01" --map "<닉네임>=i03" ...
+   ```
+   - 현재 매핑: i01=리허설 응답자, i03=수원 이과장, i04=도라에몽 (i02는 응답 없음). 닉네임에 실명이 들어간 경우 이 파일에 적지 않습니다.
+   - 생성 시 닉네임은 빠지고 나이는 연령대, 지역은 시·군·구까지만 남습니다. 인터뷰 전 테스터의 응답은 절대 저장소에 넣지 않습니다.
+5. `data/overview.js` 의 `OVERVIEW` 갱신: `updated`, `scope`, `summary`, `findings`(근거 수치 포함), `userTypes.members`, `opportunities`, `betaChecks`.
    기능별 반응 매트릭스·통계·기준선 표는 interviews.js에서 자동 계산되므로 손댈 필요 없습니다.
-5. 로컬 확인 후 커밋·푸시 (main).
+6. 로컬 확인 후 커밋·푸시 (main).
 
 ## 인터뷰 요약 화면 구성 (순서 유지)
-한눈에 보기(헤드라인·좋았던/쓰지 않을 기능·기능별 반응 띠) → 핵심 인사이트(insights) → 인상적인 발언 → 기능별 반응 → 종합 평가 → 프로필(앞 4개만, 더 보기) → 기준선(접힘).
+한눈에 보기(헤드라인·좋았던/쓰지 않을 기능·기능별 반응 띠) → 핵심 인사이트(insights) → 인상적인 발언 → 기능별 반응 → 종합 평가 → 프로필(앞 4개만, 더 보기) → 사전 설문 → 기준선(접힘).
 '내려받기'는 같은 순서로 Word(.docx)를 만들며, '요약 + 원문'은 원문을 부록으로 붙입니다. 데이터만 추가하면 자동 반영됩니다.
 
 ## 검색
