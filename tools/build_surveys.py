@@ -38,7 +38,7 @@ def region(v):
             break
     out = " ".join(keep)
     out = re.sub(r"^경시 ", "경기도 ", out)
-    # 시 단위로 끝나지 않은 경우(예: '서울시 강남구 도곡동') 동·읍 단위 제거
+    # 시 단위로 끝나지 않은 경우(예: '서울시 영등포구 여의도동') 동·읍 단위 제거
     out = re.sub(r"\s+\S+(동|읍|면|리)$", "", out)
     return out
 
