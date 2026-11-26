@@ -26,9 +26,16 @@ tools/build_transcripts.py 원문 txt → 비식별 JS 변환 스크립트
 3. `data/interviews.js` 배열 끝에 요약 객체 추가. 필드는 기존 항목과 같게 채웁니다.
    - `date`(YYYY-MM-DD), `time`(HH:MM, 모르면 ""), `duration`, `type`("본 인터뷰" | "리허설"), `persona`(잠정 유형)
    - `profile`, `features`(FEATURES의 key 사용, sentiment: pos/mix/neu/neg/na), `verdict`, `insights`, `quotes`, `baseline`(BASELINE_KEYS의 key)
+   - `quotes`는 `{ topic, text, find }` 형식. topic = 무엇에 대한 발언인지('기능 · 맥락'), find = 원문(data/transcripts)에 그대로 있는 고유 문구.
+     요약 화면에서 커서를 올리면 find로 원문을 찾아 진행자 질문 + 해당 발화를 보여주므로, 추가 후 find가 원문에서 찾아지는지 확인합니다.
 4. `data/overview.js` 의 `OVERVIEW` 갱신: `updated`, `scope`, `summary`, `findings`(근거 수치 포함), `userTypes.members`, `opportunities`, `betaChecks`.
    기능별 반응 매트릭스·통계·기준선 표는 interviews.js에서 자동 계산되므로 손댈 필요 없습니다.
 5. 로컬 확인 후 커밋·푸시 (main).
+
+## 검색
+- 상단 검색은 요약·분석 데이터와 전체 원문을 함께 찾습니다. 질문 문장에서 기능명·의도(아이디어/불편/긍정/부정/발언)·키워드를 뽑아 점수화합니다(assets/app.js).
+- 기능 인식은 `FEATURES[].core`(기능 이름, 녹취 오인식 표기 포함)와 `aliases`(관련어)로 합니다. 새 오인식 표기나 관련어가 나오면 여기에 추가합니다.
+- 기능 명칭: '가치봄'(같이 봄 아님). 원문은 녹취 그대로 두고, 요약·분석·화면 문구에서만 '가치봄'으로 씁니다.
 
 ## 반드시 지킬 것
 - **실명 표기:** 진행자(인터뷰를 진행한 팀원)는 "진행자"로, 그 외 실명은 성만 남기고 이름은 OO (예: 홍길동 부장 → 홍OO 부장). 닉네임(도라에몽 등)과 이미 성만 있는 호칭(수원 이과장)은 그대로.
