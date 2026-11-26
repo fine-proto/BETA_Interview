@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>FINE Alaseo 베타 사전 인터뷰</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header class="topbar">
+  <button class="menu-btn" id="menuBtn" aria-label="인터뷰 목록 열기">☰</button>
+  <a href="#/" class="brand">
+    <span class="brand-mark">FINE Alaseo</span>
+    <span class="brand-sub">베타테스트 사전 인터뷰</span>
+  </a>
+  <span class="updated" id="updated"></span>
+</header>
+
+<div class="layout">
+  <aside class="sidebar" id="sidebar">
+    <a href="#/" class="nav-overview" id="navOverview">
+      <span class="nav-ico">◎</span> 전체 요약 분석
+    </a>
+    <div class="nav-title">인터뷰이 목록 <span id="navCount"></span></div>
+    <nav id="navList"></nav>
+  </aside>
+  <main class="main" id="main" tabindex="-1"></main>
+</div>
+
+<script src="data/overview.js"></script>
+<script src="data/interviews.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>
