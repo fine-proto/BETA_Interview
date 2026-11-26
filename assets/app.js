@@ -225,8 +225,21 @@
   }
 
   // ---------- interview detail ----------
+  var VERDICT_FIELDS = [["substitute", "대체 가능 여부"], ["retention", "계속 쓸 조건"], ["privacy", "위치·주행 기록 수집"], ["change", "써본 뒤 인상"], ["questions", "테스터가 궁금해한 점"]];
+  var PROFILE_PREVIEW = 4;
+
+  function sentiStrip(iv) {
+    return FEATURES.map(function (F) {
+      var f = featOf(iv, F.key), k = f ? f.sentiment : "na";
+      return '<span class="strip-item ' + k + '" title="' + esc(SENTI[k] + (f ? " · " + f.reaction : "")) + '"><i></i>' + esc(F.name) + "</span>";
+    }).join("");
+  }
+
   function renderInterview(iv) {
+    var v = iv.verdict || {};
     var h = "";
+
+    // 1. 한눈에 보기
     h += '<section class="card hero"><div class="detail-head"><div>' +
       '<div class="eyebrow">인터뷰 요약</div>' +
       "<h1>" + esc(iv.name) + " " + typeBadge(iv) + "</h1>" +
@@ -234,20 +247,52 @@
       (iv.duration ? "<span><b>소요</b> " + esc(iv.duration) + "</span>" : "") +
       (iv.source ? "<span><b>구분</b> " + esc(iv.source) + "</span>" : "") +
       (iv.persona ? "<span><b>유형</b> " + esc(iv.persona) + "</span>" : "") + "</div></div>" +
-      '<a class="btn primary" href="' + trLink(iv.id) + '">원문 보기 →</a></div>' +
+      '<div class="head-actions"><a class="btn primary" href="' + trLink(iv.id) + '">원문 보기 →</a>' +
+      '<details class="dl-menu"><summary class="btn">⤓ 내려받기</summary><div class="dl-pop">' +
+      '<button type="button" data-dl="summary">요약 (Word)</button>' +
+      '<button type="button" data-dl="full">요약 + 원문 (Word)</button></div></details></div></div>' +
       (iv.headline ? '<p class="headline">' + esc(iv.headline) + "</p>" : "") +
-      ((iv.tags || []).length ? '<div style="margin-top:14px">' + iv.tags.map(function (t) { return '<span class="tag">' + esc(t) + "</span>"; }).join("") + "</div>" : "") +
-      (iv.caveat ? '<div class="note">' + esc(iv.caveat) + "</div>" : "") +
-      "</section>";
+      ((iv.tags || []).length ? '<div style="margin-top:12px">' + iv.tags.map(function (t) { return '<span class="tag">' + esc(t) + "</span>"; }).join("") + "</div>" : "") +
+      (iv.caveat ? '<div class="note">' + esc(iv.caveat) + "</div>" : "");
+    if ((v.good || []).length || (v.bad || []).length) {
+      h += '<div class="glance">' +
+        '<div><div class="glance-label">좋았던 기능</div>' + ((v.good || []).map(function (x) { return '<span class="chip-good">' + esc(x) + "</span>"; }).join("") || '<span class="muted">-</span>') + "</div>" +
+        '<div><div class="glance-label">쓰지 않을 기능</div>' + ((v.bad || []).map(function (x) { return '<span class="chip-bad">' + esc(x) + "</span>"; }).join("") || '<span class="muted">-</span>') + "</div></div>";
+    }
+    h += '<div class="glance-label" style="margin-top:14px">기능별 반응</div><div class="strip">' + sentiStrip(iv) + "</div>";
+    h += "</section>";
 
-    if ((iv.profile || []).length) {
-      h += '<section class="section"><h2>테스터 프로필</h2><div class="card"><dl class="profile">';
-      iv.profile.forEach(function (p) { h += "<dt>" + esc(p.label) + "</dt><dd>" + esc(p.text) + "</dd>"; });
-      h += "</dl></div></section>";
+    // section nav
+    var secs = [["sec-insight", "핵심 인사이트", (iv.insights || []).length], ["sec-quote", "인상적인 발언", (iv.quotes || []).length],
+      ["sec-feature", "기능별 반응", (iv.features || []).length], ["sec-verdict", "종합 평가", VERDICT_FIELDS.some(function (p) { return v[p[0]]; })],
+      ["sec-profile", "프로필", (iv.profile || []).length], ["sec-baseline", "기준선", !!iv.baseline]];
+    h += '<nav class="secnav">' + secs.filter(function (s) { return s[2]; }).map(function (s) {
+      return '<button type="button" data-go="' + s[0] + '">' + s[1] + "</button>";
+    }).join("") + "</nav>";
+
+    // 2. 핵심 인사이트
+    if ((iv.insights || []).length) {
+      h += '<section class="section" id="sec-insight"><h2>핵심 인사이트</h2><div class="card"><ol class="list">' +
+        iv.insights.map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + "</ol></div></section>";
     }
 
+    // 3. 인상적인 발언
+    if ((iv.quotes || []).length) {
+      h += '<section class="section" id="sec-quote"><h2>인상적인 발언 <span class="sub">마우스를 올리면 원문 맥락이 보입니다</span></h2><div class="quotes">';
+      iv.quotes.forEach(function (q, i) {
+        q = quoteObj(q);
+        h += '<div class="quote" tabindex="0" data-qi="' + i + '">' +
+          (q.topic ? '<div class="quote-topic">' + esc(q.topic) + "</div>" : "") +
+          '<div class="quote-text">“' + esc(q.text) + "”</div>" +
+          '<div class="quote-pop" id="qpop-' + i + '"><div class="loading" style="padding:8px">원문 불러오는 중…</div></div>' +
+          "</div>";
+      });
+      h += "</div></section>";
+    }
+
+    // 4. 기능별 반응
     if ((iv.features || []).length) {
-      h += '<section class="section"><h2>기능별 반응</h2><div class="table-wrap"><table class="feat-table"><thead><tr>' +
+      h += '<section class="section" id="sec-feature"><h2>기능별 반응</h2><div class="table-wrap"><table class="feat-table"><thead><tr>' +
         "<th>기능</th><th>반응</th><th>핵심 반응</th><th>제안</th></tr></thead><tbody>";
       FEATURES.forEach(function (F) {
         var f = featOf(iv, F.key);
@@ -262,47 +307,55 @@
       h += "</tbody></table></div></section>";
     }
 
-    var v = iv.verdict || {};
-    var vItems = [];
-    if ((v.good || []).length || (v.bad || []).length) {
-      vItems.push('<div class="card"><h3>좋았던 기능</h3>' + (v.good || []).map(function (x) { return '<span class="chip-good">' + esc(x) + "</span>"; }).join("") +
-        '<h3 style="margin-top:12px">쓰지 않을 기능</h3>' + (v.bad || []).map(function (x) { return '<span class="chip-bad">' + esc(x) + "</span>"; }).join("") + "</div>");
-    }
-    [["substitute", "대체 가능 여부"], ["retention", "계속 쓸 조건"], ["privacy", "위치·주행 기록 수집"], ["change", "써본 뒤 인상"], ["questions", "테스터가 궁금해한 점"]].forEach(function (p) {
-      if (v[p[0]]) vItems.push('<div class="card"><h3>' + p[1] + "</h3><p>" + esc(v[p[0]]) + "</p></div>");
-    });
-    if (vItems.length) h += '<section class="section"><h2>종합 평가</h2><div class="verdict">' + vItems.join("") + "</div></section>";
+    // 5. 종합 평가
+    var vItems = VERDICT_FIELDS.filter(function (p) { return v[p[0]]; })
+      .map(function (p) { return '<div class="card"><h3>' + p[1] + "</h3><p>" + esc(v[p[0]]) + "</p></div>"; });
+    if (vItems.length) h += '<section class="section" id="sec-verdict"><h2>종합 평가</h2><div class="verdict">' + vItems.join("") + "</div></section>";
 
-    if ((iv.insights || []).length) {
-      h += '<section class="section"><h2>분석</h2><div class="card"><ol class="list">' +
-        iv.insights.map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + "</ol></div></section>";
-    }
-
-    // quotes with topic + hover context
-    if ((iv.quotes || []).length) {
-      h += '<section class="section"><h2>인상적인 발언 <span class="sub">마우스를 올리면 원문 맥락이 보입니다</span></h2><div class="quotes">';
-      iv.quotes.forEach(function (q, i) {
-        q = quoteObj(q);
-        h += '<div class="quote" tabindex="0" data-qi="' + i + '">' +
-          (q.topic ? '<div class="quote-topic">' + esc(q.topic) + "</div>" : "") +
-          '<div class="quote-text">“' + esc(q.text) + "”</div>" +
-          '<div class="quote-pop" id="qpop-' + i + '"><div class="loading" style="padding:8px">원문 불러오는 중…</div></div>' +
-          "</div>";
+    // 6. 프로필 (접기)
+    if ((iv.profile || []).length) {
+      var more = iv.profile.length > PROFILE_PREVIEW;
+      h += '<section class="section" id="sec-profile"><h2>테스터 프로필</h2><div class="card profile-card' + (more ? " collapsed" : "") + '"><dl class="profile">';
+      iv.profile.forEach(function (p, i) {
+        var cls = i >= PROFILE_PREVIEW ? ' class="extra"' : "";
+        h += "<dt" + cls + ">" + esc(p.label) + "</dt><dd" + cls + ">" + esc(p.text) + "</dd>";
       });
-      h += "</div></section>";
+      h += "</dl>" + (more ? '<button type="button" class="more-btn" data-more>프로필 전체 보기 (' + iv.profile.length + "개 항목) ▾</button>" : "") + "</div></section>";
     }
 
+    // 7. 기준선 (접기)
     if (iv.baseline) {
-      h += '<section class="section"><h2>기준선 (Baseline)</h2><div class="card"><dl class="profile">';
+      h += '<section class="section" id="sec-baseline"><details class="fold"><summary><h2>기준선 (Baseline) <span class="sub">베타 결과와 비교할 항목 · 눌러서 펼치기</span></h2></summary><div class="card"><dl class="profile">';
       BASE.forEach(function (b) {
         var val = iv.baseline[b.key];
         h += "<dt>" + esc(b.name) + "</dt><dd>" + (val ? esc(val) : '<span class="muted">미확인</span>') + "</dd>";
       });
-      h += "</dl></div></section>";
+      h += "</dl></div></details></section>";
     }
 
     h += '<section class="section"><a class="btn" href="' + trLink(iv.id) + '">원문 전체 보기 →</a></section>';
     main.innerHTML = h;
+
+    // interactions
+    Array.prototype.forEach.call(main.querySelectorAll(".secnav button"), function (b) {
+      b.addEventListener("click", function () {
+        var el = document.getElementById(b.getAttribute("data-go"));
+        if (!el) return;
+        var d = el.querySelector("details"); if (d) d.open = true;
+        window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - 70, behavior: "smooth" });
+      });
+    });
+    var mb = main.querySelector("[data-more]");
+    if (mb) mb.addEventListener("click", function () {
+      var c = main.querySelector(".profile-card"), open = c.classList.toggle("collapsed") === false;
+      mb.textContent = open ? "접기 ▴" : "프로필 전체 보기 (" + iv.profile.length + "개 항목) ▾";
+    });
+    Array.prototype.forEach.call(main.querySelectorAll("[data-dl]"), function (b) {
+      b.addEventListener("click", function () {
+        var menu = main.querySelector(".dl-menu"); if (menu) menu.open = false;
+        downloadDocx(iv, b.getAttribute("data-dl") === "full");
+      });
+    });
 
     if ((iv.quotes || []).length) {
       loadTranscript(iv.id, function (turns) {
@@ -320,6 +373,99 @@
         });
       });
     }
+  }
+
+  // ---------- Word 내려받기 ----------
+  function clip(s, n) { s = String(s || ""); return s.length > n ? s.slice(0, n) + "…" : s; }
+  var SENTI_COLOR = { pos: "12805C", mix: "B26A00", neu: "5B6478", neg: "C4322B", na: "A3AAB8" };
+
+  function downloadDocx(iv, withTranscript) {
+    if (!window.MiniDocx) { alert("내려받기 모듈을 불러오지 못했습니다."); return; }
+    loadTranscript(iv.id, function (turns) {
+      var v = iv.verdict || {}, B = [];
+      B.push({ t: "title", text: iv.name + " 인터뷰 요약" });
+      B.push({ t: "small", text: [fmtDate(iv.date, iv.time), iv.duration, iv.type + (iv.source ? " · " + iv.source : ""), iv.persona ? "유형: " + iv.persona : ""].filter(Boolean).join("  |  ") });
+      if (iv.headline) B.push({ t: "p", runs: [{ text: iv.headline, b: true }] });
+      if ((iv.tags || []).length) B.push({ t: "small", text: "키워드: " + iv.tags.join(", ") });
+      if (iv.caveat) B.push({ t: "small", text: "※ " + iv.caveat });
+
+      B.push({ t: "h1", text: "한눈에 보기" });
+      B.push({ t: "table", widths: [1, 3], rows: [
+        [{ runs: "좋았던 기능", base: { b: true }, fill: "F6F7F9" }, { runs: [{ text: (v.good || []).join(", ") || "-", color: "12805C" }] }],
+        [{ runs: "쓰지 않을 기능", base: { b: true }, fill: "F6F7F9" }, { runs: [{ text: (v.bad || []).join(", ") || "-", color: "C4322B" }] }],
+        [{ runs: "기능별 반응", base: { b: true }, fill: "F6F7F9" }, { runs: FEATURES.map(function (F, i) {
+          var f = featOf(iv, F.key), k = f ? f.sentiment : "na";
+          return { text: (i ? "   " : "") + F.name + " " + SENTI[k], color: SENTI_COLOR[k] };
+        }) }]
+      ] });
+
+      if ((iv.insights || []).length) {
+        B.push({ t: "h1", text: "핵심 인사이트" });
+        iv.insights.forEach(function (x) { B.push({ t: "bullet", text: x }); });
+      }
+
+      if ((iv.quotes || []).length) {
+        B.push({ t: "h1", text: "인상적인 발언" });
+        iv.quotes.forEach(function (q) {
+          q = quoteObj(q);
+          if (q.topic) B.push({ t: "h2", text: q.topic });
+          B.push({ t: "quote", text: "“" + q.text + "”" });
+          var idx = findTurn(turns, q.find || q.text);
+          if (idx >= 0) {
+            var t = turns[idx], prev = prevModTurn(turns, idx);
+            var ctx = [];
+            if (prev) ctx.push({ text: "진행자 (" + prev.t + "): ", b: true }, { text: clip(prev.x, 160) + "\n" });
+            ctx.push({ text: t.s + " (" + t.t + "): ", b: true }, { text: clip(t.x, 320) });
+            B.push({ t: "small", runs: ctx });
+          }
+        });
+      }
+
+      if ((iv.features || []).length) {
+        B.push({ t: "h1", text: "기능별 반응" });
+        var rows = [["기능", "반응", "기대", "핵심 반응", "제안"]];
+        FEATURES.forEach(function (F) {
+          var f = featOf(iv, F.key); if (!f) return;
+          rows.push([{ runs: F.name, base: { b: true } }, { runs: [{ text: SENTI[f.sentiment || "na"], b: true, color: SENTI_COLOR[f.sentiment || "na"] }] },
+            f.expect || "", f.reaction || "", { runs: [{ text: f.suggestion || "", color: "1F4FD8" }] }]);
+        });
+        B.push({ t: "table", header: true, widths: [1.5, 0.8, 1.6, 3.4, 2.7], rows: rows });
+      }
+
+      var vf = VERDICT_FIELDS.filter(function (p) { return v[p[0]]; });
+      if (vf.length) {
+        B.push({ t: "h1", text: "종합 평가" });
+        B.push({ t: "table", widths: [1, 3], rows: vf.map(function (p) { return [{ runs: p[1], base: { b: true }, fill: "F6F7F9" }, v[p[0]]]; }) });
+      }
+
+      if ((iv.profile || []).length) {
+        B.push({ t: "h1", text: "테스터 프로필" });
+        B.push({ t: "table", widths: [1, 3.5], rows: iv.profile.map(function (p) { return [{ runs: p.label, base: { b: true }, fill: "F6F7F9" }, p.text]; }) });
+      }
+
+      if (iv.baseline) {
+        B.push({ t: "h1", text: "기준선 (Baseline)" });
+        B.push({ t: "table", widths: [1.3, 3], rows: BASE.map(function (b) { return [{ runs: b.name, base: { b: true }, fill: "F6F7F9" }, iv.baseline[b.key] || "미확인"]; }) });
+      }
+
+      if (withTranscript && turns) {
+        B.push({ t: "pagebreak" });
+        B.push({ t: "h1", text: "부록 · 인터뷰 원문" });
+        B.push({ t: "small", text: "녹취 자동 변환본입니다. 인식 오류가 있을 수 있고, 진행자는 '진행자', 그 외 실명은 성+OO로 표기했습니다." });
+        turns.forEach(function (t) {
+          B.push({ t: "p", runs: [{ text: (t.s || "-") + "  ", b: true, color: t.s === MOD ? "667085" : "1F4FD8" }, { text: t.t, color: "98A2B3", size: 17 }, { text: "\n" + t.x, color: t.s === MOD ? "4A5468" : "1D2433" }] });
+        });
+      }
+
+      B.push({ t: "small", text: "FINE Alaseo 베타테스트 사전 인터뷰 · 비식별 처리본 · 내려받은 날 " + new Date().toISOString().slice(0, 10) });
+
+      var blob = window.MiniDocx.build(B);
+      var fname = "FINE_Alaseo_사전인터뷰_" + iv.date.replace(/-/g, "") + "_" + iv.name.replace(/[\\/:*?"<>|()\s]/g, "") + (withTranscript ? "_요약+원문" : "_요약") + ".docx";
+      var a = document.createElement("a");
+      a.href = URL.createObjectURL(blob); a.download = fname;
+      document.body.appendChild(a); a.click();
+      setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+    });
   }
 
   // ---------- transcript ----------
