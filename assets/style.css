@@ -370,3 +370,32 @@ details.fold[open] > summary h2::after { content: "▴"; }
 dl.kv { grid-template-columns: 120px 1fr; }
 dl.kv dt, dl.kv dd { padding: 7px 0; font-size: 13px; }
 @media (max-width: 1000px) { .survey-grid { grid-template-columns: 1fr; } }
+
+/* ---------- 설문 탭 / 인터뷰 설문 ---------- */
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line-strong); margin-bottom: 14px; }
+.tab {
+  height: 40px; padding: 0 16px; border: 0; background: none; font-size: 14px; font-weight: 700; color: var(--text-3);
+  cursor: pointer; font-family: inherit; border-bottom: 2px solid transparent; margin-bottom: -1px;
+}
+.tab:hover { color: var(--text); }
+.tab.on { color: var(--brand); border-bottom-color: var(--brand); }
+.tab-empty { font-size: 11px; font-weight: 600; color: var(--na); margin-left: 2px; }
+.post-tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.post-tile { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; }
+.post-tile.wide { grid-column: 1 / -1; }
+.post-val { font-size: 15px; font-weight: 700; }
+.rating { display: inline-flex; align-items: center; gap: 2px; font-size: 13px; }
+.rating b { font-size: 20px; }
+.rating-bar { display: inline-block; width: 80px; height: 6px; border-radius: 3px; background: #eceef2; margin-left: 10px; overflow: hidden; vertical-align: middle; }
+.rating-bar i { display: block; height: 100%; background: var(--brand); }
+td .rating b { font-size: 15px; }
+.int-row.with-delta { grid-template-columns: 1fr 70px 92px 18px; }
+.int-delta { font-size: 11px; font-weight: 800; text-align: center; }
+.int-delta.up { color: var(--pos); } .int-delta.down { color: var(--neg); } .int-delta.same { color: var(--na); }
+.int-bar i.on.s5 { background: var(--brand); }
+.int-bar i.on.s4 { background: #6b8ff0; }
+.int-bar i.on.s3 { background: #aeb6c6; }
+.int-bar i.on.s2 { background: #d3d8e0; }
+.int-bar i.on.s1 { background: #f0b7b3; }
+.int-level.s5 { color: var(--brand); } .int-level.s4 { color: #4a72e0; } .int-level.s3 { color: var(--text-3); } .int-level.s2 { color: var(--na); } .int-level.s1 { color: var(--neg); }
+@media (max-width: 760px) { .post-tiles { grid-template-columns: 1fr; } }

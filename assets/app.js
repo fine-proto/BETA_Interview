@@ -188,6 +188,8 @@
     });
     h += '</tbody></table></div><p class="muted" style="font-size:12px;margin:8px 2px 0">칸에 마우스를 올리면 해당 테스터의 반응 요약이 보입니다.</p></section>';
 
+    h += renderPostOverview(list);
+
     if (OV.userTypes && OV.userTypes.length) {
       h += '<section class="section"><h2>사용자 유형 <span class="sub">잠정 분류</span></h2><div class="types">';
       OV.userTypes.forEach(function (t) {
@@ -220,6 +222,59 @@
     h += "</tbody></table></div></section>";
 
     main.innerHTML = h;
+  }
+  function renderPostOverview(list) {
+    var POSTS = window.POST_SURVEYS || {}, PRES = window.SURVEYS || {};
+    var LS = { "매우 관심있음": 5, "관심있음": 4, "필요함": 4, "보통": 3, "관심없음": 2, "필요 없음": 2, "전혀 관심없음": 1 };
+    var sm = function (n) { return String(n || "").split(" (")[0].replace(/\.$/, ""); };
+    var rows = list.filter(function (iv) { return POSTS[iv.id]; });
+    var h = '<section class="section"><h2>인터뷰 후 설문 <span class="sub">인터뷰 직후 응답 · 자동 집계 · ' + rows.length + "명</span></h2>";
+    if (!rows.length) return h + '<div class="card muted">아직 인터뷰 설문 응답이 없습니다.</div></section>';
+    var ratings = rows.map(function (iv) { return parseFloat(POSTS[iv.id].rating); }).filter(function (n) { return !isNaN(n); });
+    var avg = ratings.length ? Math.round(ratings.reduce(function (a, b) { return a + b; }, 0) / ratings.length * 10) / 10 : "-";
+    var ok = rows.filter(function (iv) { return /괜찮/.test(POSTS[iv.id].privacy || ""); }).length;
+    h += '<div class="stats" style="grid-template-columns:repeat(3,1fr);margin-top:0">' +
+      stat("평균 사용 의향", avg + " / 5", "실제로 연결해 쓴다면") +
+      stat("위치 포함 주행 기록 자동 전송", ok + " / " + rows.length + "명", "'기능 쓰려면 괜찮다'") +
+      stat("응답", rows.length + "명", "인터뷰 " + list.length + "명 중") + "</div>";
+    h += '<div class="table-wrap" style="margin-top:12px"><table><thead><tr><th>테스터</th><th>사용 의향</th><th>예상 사용 빈도</th><th>위치·주행 기록 전송</th><th>지인에게 한 문장 소개</th></tr></thead><tbody>';
+    rows.forEach(function (iv) {
+      var P = POSTS[iv.id];
+      h += '<tr><td class="rowhead"><a href="#/i/' + esc(iv.id) + '">' + esc(iv.name) + "</a></td><td>" + ratingBar(P.rating) + "</td><td>" + esc(P.frequency || "-") +
+        "</td><td>" + esc(P.privacy || "-") + "</td><td>" + (P.oneLiner ? "“" + esc(P.oneLiner) + "”" : '<span class="muted">-</span>') + "</td></tr>";
+    });
+    h += "</tbody></table></div>";
+    // 기능 관심도: 사전 → 인터뷰 후 (둘 다 응답한 사람 기준)
+    var names = [], agg = {};
+    rows.forEach(function (iv) {
+      var pre = {};
+      (PRES[iv.id] ? PRES[iv.id].interest : []).forEach(function (c) { pre[sm(c.name)] = c.level; });
+      (POSTS[iv.id].interest || []).forEach(function (it) {
+        var n = sm(it.name);
+        if (names.indexOf(n) < 0) { names.push(n); agg[n] = { post: [], pre: [], up: 0, down: 0 }; }
+        var a = LS[it.level] || 0, b = LS[pre[n]] || 0;
+        if (a) agg[n].post.push(a);
+        if (a && b) { agg[n].pre.push(b); if (a > b) agg[n].up++; else if (a < b) agg[n].down++; }
+      });
+    });
+    var mean = function (arr) { return arr.length ? arr.reduce(function (x, y) { return x + y; }, 0) / arr.length : null; };
+    h += '<div class="table-wrap" style="margin-top:12px"><table class="matrix"><thead><tr><th class="rowhead">베타에서 먼저 써보고 싶은 기능</th>';
+    rows.forEach(function (iv) { h += '<th class="col"><a href="#/i/' + esc(iv.id) + '">' + esc(iv.name) + "</a></th>"; });
+    h += "<th>평균 (5점)</th><th>사전 설문 대비</th></tr></thead><tbody>";
+    names.forEach(function (n) {
+      var A = agg[n], m = mean(A.post), mp = mean(A.pre);
+      h += '<tr><td class="rowhead">' + esc(n) + "</td>";
+      rows.forEach(function (iv) {
+        var it = (POSTS[iv.id].interest || []).filter(function (x) { return sm(x.name) === n; })[0];
+        var sc = it ? (LS[it.level] || 0) : 0;
+        h += '<td><span class="int-level s' + sc + '" style="font-size:12px">' + esc(it ? it.level : "-") + "</span></td>";
+      });
+      h += "<td><b>" + (m != null ? (Math.round(m * 10) / 10) : "-") + "</b></td><td>" +
+        (A.up ? '<span class="int-delta up">▲' + A.up + "</span> " : "") + (A.down ? '<span class="int-delta down">▼' + A.down + "</span>" : "") +
+        (!A.up && !A.down ? '<span class="muted">변화 없음</span>' : "") + "</td></tr>";
+    });
+    h += '</tbody></table></div><p class="muted" style="font-size:12px;margin:8px 2px 0">점수: 매우 관심있음 5 · 관심있음(필요함) 4 · 보통 3 · 관심없음(필요 없음) 2 · 전혀 관심없음 1. ▲▼는 사전 설문보다 관심도가 오르거나 내린 사람 수입니다.</p></section>';
+    return h;
   }
   function stat(label, value, sub) {
     return '<div class="stat"><div class="stat-label">' + esc(label) + '</div><div class="stat-value">' + esc(value) +
@@ -267,7 +322,7 @@
     // section nav
     var secs = [["sec-insight", "핵심 인사이트", (iv.insights || []).length], ["sec-quote", "인상적인 발언", (iv.quotes || []).length],
       ["sec-feature", "기능별 반응", (iv.features || []).length], ["sec-verdict", "종합 평가", VERDICT_FIELDS.some(function (p) { return v[p[0]]; })],
-      ["sec-profile", "프로필", (iv.profile || []).length], ["sec-survey", "사전 설문", true], ["sec-baseline", "기준선", !!iv.baseline]];
+      ["sec-profile", "프로필", (iv.profile || []).length], ["sec-survey", "설문", true], ["sec-baseline", "기준선", !!iv.baseline]];
     h += '<nav class="secnav">' + secs.filter(function (s) { return s[2]; }).map(function (s) {
       return '<button type="button" data-go="' + s[0] + '">' + s[1] + "</button>";
     }).join("") + "</nav>";
@@ -325,7 +380,7 @@
       h += "</dl>" + (more ? '<button type="button" class="more-btn" data-more>프로필 전체 보기 (' + iv.profile.length + "개 항목) ▾</button>" : "") + "</div></section>";
     }
 
-    // 7. 사전 설문
+    // 7. 설문 (인터뷰 설문 / 사전 설문)
     h += renderSurvey(iv);
 
     // 8. 기준선 (접기)
@@ -342,6 +397,7 @@
     main.innerHTML = h;
 
     // interactions
+    bindSurveyTabs();
     Array.prototype.forEach.call(main.querySelectorAll(".secnav button"), function (b) {
       b.addEventListener("click", function () {
         var el = document.getElementById(b.getAttribute("data-go"));
@@ -380,40 +436,88 @@
     }
   }
 
-  // ---------- 사전 설문 ----------
-  function levelIdx(l) { var i = LEVELS.indexOf(l); return i < 0 ? -1 : i; }
+  // ---------- 설문 (인터뷰 설문 / 사전 설문) ----------
+  var POST = window.POST_SURVEYS || {};
+  var LEVEL_SCORE = { "매우 관심있음": 5, "관심있음": 4, "필요함": 4, "보통": 3, "관심없음": 2, "필요 없음": 2, "전혀 관심없음": 1 };
+  function lvScore(l) { return LEVEL_SCORE[l] || 0; }
+  function shortMenu(n) { return String(n || "").split(" (")[0].replace(/\.$/, ""); }
   function kvTable(rows) {
     return '<dl class="profile kv">' + rows.map(function (r) {
       return "<dt>" + esc(r[0]) + "</dt><dd>" + (r[1] ? esc(r[1]) : '<span class="muted">-</span>') + "</dd>";
     }).join("") + "</dl>";
   }
-  function renderSurvey(iv) {
+  function interestRows(list, compare) {
+    var cmp = {};
+    (compare || []).forEach(function (c) { cmp[shortMenu(c.name)] = c.level; });
+    return '<div class="interest">' + (list || []).map(function (it) {
+      var sc = lvScore(it.level), name = shortMenu(it.name), delta = "";
+      if (compare) {
+        var before = cmp[name], d = sc - lvScore(before);
+        delta = before ? '<span class="int-delta ' + (d > 0 ? "up" : d < 0 ? "down" : "same") + '" title="사전 설문: ' + esc(before) + '">' +
+          (d > 0 ? "▲" : d < 0 ? "▼" : "–") + "</span>" : '<span class="int-delta same">·</span>';
+      }
+      return '<div class="int-row' + (compare ? " with-delta" : "") + '"><span class="int-name" title="' + esc(it.name) + '">' + esc(name) + '</span><span class="int-bar">' +
+        [1, 2, 3, 4, 5].map(function (n) { return '<i class="' + (n <= sc ? "on s" + sc : "") + '"></i>'; }).join("") +
+        '</span><span class="int-level s' + sc + '">' + esc(it.level || "-") + "</span>" + delta + "</div>";
+    }).join("") + "</div>";
+  }
+  function ratingBar(r) {
+    var n = typeof r === "number" ? r : parseFloat(r);
+    if (isNaN(n)) return esc(r || "-");
+    return '<span class="rating"><b>' + (Math.round(n * 10) / 10) + '</b><span class="muted"> / 5</span><span class="rating-bar"><i style="width:' + (n / 5 * 100) + '%"></i></span></span>';
+  }
+
+  function renderPostPane(iv) {
+    var P = POST[iv.id], S = SURVEYS[iv.id];
+    if (!P) return '<div class="card muted">이 테스터의 인터뷰 설문 응답이 없습니다.</div>';
+    return '<div class="post-tiles">' +
+      '<div class="post-tile"><div class="glance-label">실제로 쓴다면 사용 의향</div>' + ratingBar(P.rating) + "</div>" +
+      '<div class="post-tile"><div class="glance-label">예상 사용 빈도</div><div class="post-val">' + esc(P.frequency || "-") + "</div></div>" +
+      '<div class="post-tile"><div class="glance-label">위치 포함 주행 기록 자동 전송</div><div class="post-val">' + esc(P.privacy || "-") + "</div></div>" +
+      '<div class="post-tile wide"><div class="glance-label">지인에게 한 문장으로 소개한다면</div><div class="post-val">' + (P.oneLiner ? "“" + esc(P.oneLiner) + "”" : '<span class="muted">응답 없음</span>') + "</div></div>" +
+      "</div>" +
+      '<div class="card" style="margin-top:12px"><h3>베타에서 먼저 써보고 싶은 기능 ' +
+      (S ? '<span class="sub" style="font-weight:500;font-size:12px;color:var(--text-3)">▲▼ 사전 설문 대비 관심도 변화</span>' : "") + "</h3>" +
+      interestRows(P.interest, S ? S.interest : null) + "</div>" +
+      '<p class="muted" style="font-size:12px;margin:8px 2px 0">인터뷰 직후 응답 · ' + esc(P.submitted) + " 제출</p>";
+  }
+
+  function renderPrePane(iv) {
     var S = SURVEYS[iv.id];
-    var h = '<section class="section" id="sec-survey"><h2>사전 설문 <span class="sub">' +
-      (S ? "인터뷰 전 온라인 응답 · " + esc(S.submitted) + " 제출" : "") + "</span></h2>";
-    if (!S) return h + '<div class="card muted">이 테스터의 사전 설문 응답이 없습니다.</div></section>';
-    h += '<div class="survey-grid">';
-    // 첫인상
+    if (!S) return '<div class="card muted">이 테스터의 사전 설문 응답이 없습니다.</div>';
+    var h = '<div class="survey-grid">';
     h += '<div class="card"><h3>앱 첫인상</h3>' +
       (S.service ? '<p class="survey-service">“' + esc(S.service) + '”</p><div class="muted" style="font-size:12px;margin:-4px 0 10px">어떤 서비스를 제공하는 앱으로 보이나요?</div>' : "") +
       ((S.words || []).length ? '<div class="glance-label">첫인상 단어</div><div style="margin-bottom:12px">' + S.words.map(function (w) { return '<span class="tag">' + esc(w) + "</span>"; }).join("") + "</div>" : "") +
-      '<div class="glance-label">경험해 보고 싶은 메뉴</div><div class="interest">' +
-      (S.interest || []).map(function (it) {
-        var k = levelIdx(it.level);
-        return '<div class="int-row"><span class="int-name">' + esc(it.name) + '</span><span class="int-bar">' +
-          [0, 1, 2, 3, 4].map(function (n) { return '<i class="' + (k >= 0 && n >= k ? "on l" + k : "") + '"></i>'; }).reverse().join("") +
-          '</span><span class="int-level l' + k + '">' + esc(it.level || "-") + "</span></div>";
-      }).join("") + "</div>" +
+      '<div class="glance-label">경험해 보고 싶은 메뉴</div>' + interestRows(S.interest, null) +
       (S.reason ? '<div class="glance-label" style="margin-top:12px">이렇게 고른 이유</div><p style="margin:0;font-size:14px">' + esc(S.reason) + "</p>" : "") +
       "</div>";
-    // 응답 상세
     h += '<div class="card"><h3>차량·주차</h3>' + kvTable(S.basic || []) +
       '<h3 style="margin-top:16px">블랙박스</h3>' + kvTable(S.blackbox || []) +
       '<h3 style="margin-top:16px">사고·신고</h3>' + kvTable(S.incident || []) +
       (S.apps ? '<h3 style="margin-top:16px">사용 중인 차량 관련 앱</h3><p style="margin:0;font-size:14px">' + esc(S.apps) + "</p>" : "") +
-      "</div>";
-    h += "</div></section>";
+      "</div></div>" +
+      '<p class="muted" style="font-size:12px;margin:8px 2px 0">인터뷰 전 온라인 응답 · ' + esc(S.submitted) + " 제출</p>";
     return h;
+  }
+
+  function renderSurvey(iv) {
+    return '<section class="section" id="sec-survey"><h2>설문</h2>' +
+      '<div class="tabs" role="tablist">' +
+      '<button type="button" role="tab" class="tab on" data-tab="post" aria-selected="true">인터뷰 설문' + (POST[iv.id] ? "" : ' <span class="tab-empty">없음</span>') + "</button>" +
+      '<button type="button" role="tab" class="tab" data-tab="pre" aria-selected="false">사전 설문' + (SURVEYS[iv.id] ? "" : ' <span class="tab-empty">없음</span>') + "</button></div>" +
+      '<div class="tab-pane" data-pane="post">' + renderPostPane(iv) + "</div>" +
+      '<div class="tab-pane" data-pane="pre" hidden>' + renderPrePane(iv) + "</div></section>";
+  }
+  function bindSurveyTabs() {
+    var sec = document.getElementById("sec-survey");
+    if (!sec) return;
+    sec.querySelector(".tabs").addEventListener("click", function (e) {
+      var b = e.target.closest("[data-tab]"); if (!b) return;
+      var k = b.getAttribute("data-tab");
+      Array.prototype.forEach.call(sec.querySelectorAll("[data-tab]"), function (x) { var on = x === b; x.classList.toggle("on", on); x.setAttribute("aria-selected", on); });
+      Array.prototype.forEach.call(sec.querySelectorAll("[data-pane]"), function (p) { p.hidden = p.getAttribute("data-pane") !== k; });
+    });
   }
 
   // ---------- Word 내려받기 ----------
@@ -484,25 +588,42 @@
         B.push({ t: "table", widths: [1, 3.5], rows: iv.profile.map(function (p) { return [{ runs: p.label, base: { b: true }, fill: "F6F7F9" }, p.text]; }) });
       }
 
-      var S = SURVEYS[iv.id];
-      B.push({ t: "h1", text: "사전 설문" });
+      var S = SURVEYS[iv.id], PS = POST[iv.id];
+      var LC = { 5: "1F4FD8", 4: "4A72E0", 3: "667085", 2: "98A2B3", 1: "C4322B", 0: "667085" };
+      var lab = function (t) { return { runs: t, base: { b: true }, fill: "F6F7F9" }; };
+      B.push({ t: "h1", text: "설문" });
+      B.push({ t: "h2", text: "인터뷰 설문 (인터뷰 직후)" });
+      if (!PS) B.push({ t: "small", text: "이 테스터의 인터뷰 설문 응답이 없습니다." });
+      else {
+        B.push({ t: "table", widths: [1.4, 3], rows: [
+          [lab("사용 의향"), (typeof PS.rating === "number" ? PS.rating + " / 5" : (PS.rating || "-"))],
+          [lab("예상 사용 빈도"), PS.frequency || "-"],
+          [lab("위치 포함 주행 기록 자동 전송"), PS.privacy || "-"],
+          [lab("지인에게 한 문장 소개"), PS.oneLiner || "-"]
+        ] });
+        var preMap = {};
+        (S ? S.interest : []).forEach(function (c) { preMap[shortMenu(c.name)] = c.level; });
+        B.push({ t: "table", header: true, widths: [2.4, 1.3, 1.3, 0.6], rows: [["베타에서 먼저 써보고 싶은 기능", "인터뷰 설문", "사전 설문", "변화"]].concat((PS.interest || []).map(function (it) {
+          var n = shortMenu(it.name), a = lvScore(it.level), bL = preMap[n], b = lvScore(bL), d = bL ? a - b : null;
+          return [n, { runs: [{ text: it.level || "-", color: LC[a] }] }, { runs: [{ text: bL || "-", color: LC[b] }] },
+            { runs: [{ text: d == null ? "" : d > 0 ? "▲" : d < 0 ? "▼" : "–", color: d > 0 ? "12805C" : d < 0 ? "C4322B" : "98A2B3", b: true }] }];
+        })) });
+        B.push({ t: "small", text: "인터뷰 직후 응답 · " + PS.submitted + " 제출" });
+      }
+      B.push({ t: "h2", text: "사전 설문 (인터뷰 전)" });
       if (!S) B.push({ t: "small", text: "이 테스터의 사전 설문 응답이 없습니다." });
       else {
-        B.push({ t: "small", text: "인터뷰 전 온라인 응답 · " + S.submitted + " 제출" });
-        B.push({ t: "h2", text: "앱 첫인상" });
         B.push({ t: "table", widths: [1.3, 3], rows: [
-          [{ runs: "어떤 앱으로 보이나요", base: { b: true }, fill: "F6F7F9" }, S.service || "-"],
-          [{ runs: "첫인상 단어", base: { b: true }, fill: "F6F7F9" }, (S.words || []).join(", ") || "-"],
-          [{ runs: "선택 이유", base: { b: true }, fill: "F6F7F9" }, S.reason || "-"]
+          [lab("어떤 앱으로 보이나요"), S.service || "-"],
+          [lab("첫인상 단어"), (S.words || []).join(", ") || "-"],
+          [lab("선택 이유"), S.reason || "-"]
         ] });
-        B.push({ t: "h2", text: "경험해 보고 싶은 메뉴" });
-        var LC = ["1F4FD8", "4A72E0", "667085", "98A2B3", "C4322B"];
-        B.push({ t: "table", header: true, widths: [3, 1.3], rows: [["메뉴", "관심도"]].concat((S.interest || []).map(function (it) {
-          var k = levelIdx(it.level); return [it.name, { runs: [{ text: it.level || "-", b: k <= 1 && k >= 0, color: LC[k] || "667085" }] }];
+        B.push({ t: "table", header: true, widths: [3, 1.3], rows: [["경험해 보고 싶은 메뉴", "관심도"]].concat((S.interest || []).map(function (it) {
+          var k = lvScore(it.level); return [shortMenu(it.name), { runs: [{ text: it.level || "-", b: k >= 4, color: LC[k] }] }];
         })) });
-        B.push({ t: "h2", text: "응답 상세" });
         B.push({ t: "table", widths: [1.3, 3], rows: [].concat(S.basic || [], S.blackbox || [], S.incident || [], S.apps ? [["사용 중인 차량 관련 앱", S.apps]] : [])
-          .map(function (r) { return [{ runs: r[0], base: { b: true }, fill: "F6F7F9" }, r[1] || "-"]; }) });
+          .map(function (r) { return [lab(r[0]), r[1] || "-"]; }) });
+        B.push({ t: "small", text: "인터뷰 전 온라인 응답 · " + S.submitted + " 제출" });
       }
 
       if (iv.baseline) {

@@ -2,7 +2,8 @@
 """사전 설문(구글폼 응답 xlsx) → data/surveys.js
 
 인터뷰를 마친 테스터만 사이트에 넣습니다. 닉네임과 인터뷰 id를 짝지어 넘깁니다.
-  python3 tools/build_surveys.py 설문.xlsx data/surveys.js --map "닉네임=i03" --map "다른닉네임=i04" ...
+  python3 tools/build_surveys.py 사전설문.xlsx data/surveys.js [--post 인터뷰후설문.xlsx] --map "닉네임=i03" --map "다른닉네임=i04" ...
+사전 설문 → window.SURVEYS, 인터뷰 후 설문 → window.POST_SURVEYS
 
 공개 저장소용 비식별 처리:
 - 닉네임은 저장하지 않음 (id로만 연결)
@@ -46,11 +47,14 @@ def region(v):
 def main():
     src, out = sys.argv[1], sys.argv[2]
     mp = {}
+    post_src = None
     args = sys.argv[3:]
     for i, a in enumerate(args):
         if a == "--map":
             k, v = args[i + 1].split("=", 1)
             mp[k.strip()] = v.strip()
+        if a == "--post":
+            post_src = args[i + 1]
 
     ws = openpyxl.load_workbook(src, data_only=True).worksheets[0]
     hdr = [str(c.value or "") for c in ws[1]]
@@ -71,7 +75,7 @@ def main():
         "apps": col("자동차 관련 앱"), "report": col("교통위반 신고"), "service": col("어떤 서비스를 제공"),
         "words": col("첫 인상에 가까운"), "reason": col("선택하신 이유"),
     }
-    interest_cols = [(i, re.search(r"\[(.+)\]", h).group(1).strip()) for i, h in enumerate(hdr) if "경험해 보고 싶은 메뉴" in h and "[" in h]
+    interest_cols = [(i, re.findall(r"\[([^\[\]]+)\]", h)[-1].strip()) for i, h in enumerate(hdr) if "경험해 보고 싶은 메뉴" in h and "[" in h]
 
     data, unmatched = {}, []
     for r in ws.iter_rows(min_row=2, values_only=True):
@@ -98,13 +102,57 @@ def main():
             "reason": g("reason"),
         }
 
+    post = {}
+    post_unmatched = []
+    if post_src:
+        pws = openpyxl.load_workbook(post_src, data_only=True).worksheets[0]
+        ph = [str(c.value or "") for c in pws[1]]
+
+        def pcol(*keys):
+            for i, h in enumerate(ph):
+                if all(k in h for k in keys):
+                    return i
+            raise KeyError(keys)
+
+        P = {"nick": pcol("닉네임"), "freq": pcol("얼마나 자주"), "privacy": pcol("위치를 포함한"),
+             "one": pcol("한 문장으로"), "rating": pcol("얼마나 사용할")}
+        p_interest = [(i, re.findall(r"\[([^\[\]]+)\]", h)[-1].strip()) for i, h in enumerate(ph) if "먼저 사용해보고 싶은" in h and "[" in h]
+        for r in pws.iter_rows(min_row=2, values_only=True):
+            if not any(r):
+                continue
+            nick = str(r[P["nick"]] or "").strip()
+            iid = mp.get(nick)
+            if not iid:
+                post_unmatched.append(nick)
+                continue
+            gv = lambda k: ("" if r[P[k]] is None else str(r[P[k]]).strip())
+            ts = r[0]
+            rating = gv("rating")
+            try:
+                rating = float(rating)
+            except ValueError:
+                pass
+            one = gv("one")
+            post[iid] = {
+                "submitted": ts.strftime("%Y-%m-%d %H:%M") if hasattr(ts, "strftime") else str(ts)[:16],
+                "frequency": gv("freq"),
+                "rating": rating,
+                "privacy": gv("privacy"),
+                "oneLiner": "" if one.lower() in ("x", "-", "없음") else one,
+                "interest": [{"name": name, "level": ("" if r[i] is None else str(r[i]).strip())} for i, name in p_interest],
+            }
+
     with open(out, "w", encoding="utf-8") as f:
         f.write("// 자동 생성 파일: tools/build_surveys.py 로 만들어집니다. 직접 수정하지 마세요.\n")
         f.write("// 인터뷰를 마친 테스터의 사전 설문만 포함합니다 (닉네임 미포함, 연령대·시군구 단위로 비식별).\n")
         f.write("window.SURVEY_LEVELS = %s;\n" % json.dumps(LEVELS, ensure_ascii=False))
         f.write("window.SURVEYS = %s;\n" % json.dumps(data, ensure_ascii=False, indent=1))
+        f.write("// 인터뷰 직후 진행한 설문 (앱 전체 평가)\n")
+        f.write("window.POST_SURVEYS = %s;\n" % json.dumps(post, ensure_ascii=False, indent=1))
     print("included:", sorted(data))
     print("not included (인터뷰 전):", len(unmatched))
+    if post_src:
+        print("post included:", sorted(post), "/ post not matched:", len(post_unmatched))
 
 
 if __name__ == "__main__":
