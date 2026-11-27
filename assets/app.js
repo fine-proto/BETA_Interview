@@ -247,9 +247,9 @@
     h += '<section class="section"><h2>핵심 결론 <span class="sub">눌러서 근거 보기</span></h2><div class="concl">';
     (OV.conclusions || []).forEach(function (c, i) {
       var vs = (c.voices || []).filter(function (v) { var iv = byId(v.iv); return iv && list.indexOf(iv) >= 0; });
-      h += '<details class="concl-item"><summary><span class="concl-no">' + (i + 1) + '</span><span class="concl-title">' + esc(c.title) + "</span>" +
-        (c.evidence ? '<span class="concl-ev">' + esc(c.evidence) + "</span>" : "") +
-        (vs.length ? '<span class="concl-vc">발언 ' + vs.length + "</span>" : "") + "</summary>" +
+      h += '<details class="concl-item"><summary><span class="concl-no">' + (i + 1) + '</span><span class="concl-main"><span class="concl-title">' + esc(c.title) + "</span>" +
+        ((c.evidence || vs.length) ? '<span class="concl-meta">' + (c.evidence ? '<span class="concl-ev">' + esc(c.evidence) + "</span>" : "") +
+          (vs.length ? '<span class="concl-vc">발언 ' + vs.length + "</span>" : "") + "</span>" : "") + "</span></summary>" +
         '<div class="concl-body"><p>' + esc(c.detail || "") + "</p>" +
         (vs.length ? '<div class="voices"><div class="voices-label">테스터 발언</div>' + vs.map(function (v) {
           var iv = byId(v.iv);
