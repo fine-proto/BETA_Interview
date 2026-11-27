@@ -522,3 +522,16 @@ td .rating b { font-size: 15px; }
 .vscore.hi { background: #e7f6ee; color: #16794a; }
 .vscore.mid { background: #fdf3e1; color: #a56a07; }
 .vscore.lo { background: #fde8e8; color: #c0392b; }
+
+/* 기능별 분석 표 정렬 */
+.ftable th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+.ftable th.sortable:hover { color: var(--brand); }
+.ftable th.sortable.on { color: var(--brand); }
+.sort-ic { font-size: 10px; opacity: .55; }
+.ftable th.sortable.on .sort-ic { opacity: 1; }
+.sortbar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 10px; font-size: 13px; }
+.sort-chip { border: 1px solid var(--line); background: var(--surface); color: var(--text); border-radius: 999px; padding: 4px 12px; font: inherit; font-size: 13px; cursor: pointer; }
+.sort-chip:hover { border-color: var(--brand); color: var(--brand); }
+.sort-chip.on { background: var(--brand); border-color: var(--brand); color: #fff; font-weight: 700; }
+.sort-chip.reset { color: var(--muted); }
+@media (min-width: 761px) { .sortbar { display: none; } }

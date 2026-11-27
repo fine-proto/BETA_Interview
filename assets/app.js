@@ -138,6 +138,7 @@
   var BADGE = { keep: "유지", improve: "개선", review: "재검토" };
   var OV_TABS = [["summary", "요약"], ["features", "기능별 분석"], ["types", "사용자 유형·설문"], ["ref", "참고 자료"]];
   var onlyMain = false;
+  var ftSort = { key: "", dir: "" }; // 기능별 분석 표 정렬 상태
   try { onlyMain = localStorage.getItem("ovOnlyMain") === "1"; } catch (e) {}
 
   function badge(k) { return k ? '<span class="vbadge ' + k + '">' + BADGE[k] + "</span>" : ""; }
@@ -223,6 +224,15 @@
         });
       });
     });
+    Array.prototype.forEach.call(main.querySelectorAll("th.sortable, .sort-chip"), function (el) {
+      el.addEventListener("click", function () {
+        var k = el.getAttribute("data-sort");
+        if (!k) ftSort = { key: "", dir: "" };
+        else if (ftSort.key === k) ftSort = ftSort.dir === "desc" ? { key: k, dir: "asc" } : { key: "", dir: "" };
+        else ftSort = { key: k, dir: k === "name" || k === "badge" ? "asc" : "desc" };
+        renderOverview({ tab: tab });
+      });
+    });
     Array.prototype.forEach.call(main.querySelectorAll("tr.frow"), function (tr) {
       tr.addEventListener("click", function (e) {
         if (e.target.closest("a")) return;
@@ -294,10 +304,41 @@
     var V = window.VERDICTS || {}, PI = postInterestByFeature(list);
     var order = { keep: 0, improve: 1, review: 2 };
     var rank = function (k) { var b = (V[k] || {}).badge; return b in order ? order[b] : 9; };
+    var interestOf = function (k) { var a = PI[k] || []; return a.length ? Math.max.apply(null, a.map(function (x) { return x.avg; })) : null; };
+    var reactionOf = function (k) {
+      var p = 0, t = 0;
+      list.forEach(function (iv) { var f = featOf(iv, k), s = f ? f.sentiment : "na"; if (s === "na") return; t++; p += s === "pos" ? 1 : s === "mix" ? 0.5 : 0; });
+      return t ? p / t : null;
+    };
+    var sortVal = {
+      name: function (F) { return F.name; },
+      badge: function (F) { return rank(F.key); },
+      reaction: function (F) { return reactionOf(F.key); },
+      interest: function (F) { return interestOf(F.key); }
+    };
     var feats = FEATURES.slice().sort(function (a, b) { return rank(a.key) - rank(b.key); });
+    if (ftSort.key && sortVal[ftSort.key]) {
+      var fn = sortVal[ftSort.key], sgn = ftSort.dir === "asc" ? 1 : -1;
+      feats.sort(function (a, b) {
+        var x = fn(a), y = fn(b);
+        if (x == null && y == null) return rank(a.key) - rank(b.key);
+        if (x == null) return 1; if (y == null) return -1;
+        var c = typeof x === "string" ? x.localeCompare(y, "ko") : x - y;
+        return c ? c * sgn : rank(a.key) - rank(b.key);
+      });
+    }
+    var th = function (key, label, tip) {
+      var on = ftSort.key === key, arrow = on ? (ftSort.dir === "asc" ? "▲" : "▼") : "↕";
+      return '<th class="sortable' + (on ? " on" : "") + '" data-sort="' + key + '" title="' + esc(tip) + '"><span>' + label + '</span> <span class="sort-ic">' + arrow + "</span></th>";
+    };
     var h = '<div class="legend">' + ["pos", "mix", "neu", "neg"].map(senti).join("") +
-      '<span class="muted" style="margin-left:6px">행을 누르면 판정 근거와 테스터별 반응이 펼쳐집니다.</span></div>';
-    h += '<div class="table-wrap"><table class="ftable"><thead><tr><th>기능</th><th>판정</th><th>한 줄 결론</th><th>인터뷰 반응 (' + list.length + '명)</th><th>써본 뒤 관심도</th></tr></thead><tbody>';
+      '<span class="muted" style="margin-left:6px">행을 누르면 판정 근거와 테스터별 반응이 펼쳐집니다. 제목을 누르면 정렬됩니다.</span></div>';
+    h += '<div class="sortbar"><span class="muted">정렬</span>' + [["interest", "관심도"], ["reaction", "인터뷰 반응"], ["badge", "판정"], ["name", "기능명"]].map(function (o) {
+      var on = ftSort.key === o[0];
+      return '<button type="button" class="sort-chip' + (on ? " on" : "") + '" data-sort="' + o[0] + '">' + o[1] + (on ? (ftSort.dir === "asc" ? " ▲" : " ▼") : "") + "</button>";
+    }).join("") + (ftSort.key ? '<button type="button" class="sort-chip reset" data-sort="">기본 순서</button>' : "") + "</div>";
+    h += '<div class="table-wrap"><table class="ftable"><thead><tr>' + th("name", "기능", "기능명 가나다순") + th("badge", "판정", "유지 → 개선 → 재검토") + "<th>한 줄 결론</th>" +
+      th("reaction", "인터뷰 반응 (" + list.length + "명)", "긍정 1, 조건부 0.5, 중립·부정 0으로 계산한 평균") + th("interest", "써본 뒤 관심도", "인터뷰 직후 설문 평균(5점). 문항이 둘이면 높은 쪽 기준") + "</tr></thead><tbody>";
     feats.forEach(function (F) {
       var v = V[F.key] || {};
       h += '<tr class="frow"><td class="rowhead">' + esc(F.name) + ' <span class="caret">▾</span></td><td>' + badge(v.badge) + "</td><td>" + esc(v.line || "") + "</td><td>" + sentiDist(list, F.key) + "</td><td>" + interestCell(PI[F.key]) + "</td></tr>";
