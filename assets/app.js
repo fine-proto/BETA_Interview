@@ -263,12 +263,22 @@
     h += "</div></section>";
 
     // 판정 요약
-    var groups = { keep: [], improve: [], review: [] };
+    var groups = { keep: [], improve: [], review: [] }, PI = postInterestByFeature(list);
+    var topScore = function (F) { var a = PI[F.key] || []; return a.length ? Math.max.apply(null, a.map(function (x) { return x.avg; })) : -1; };
     FEATURES.forEach(function (F) { var v = V[F.key]; if (v && groups[v.badge]) groups[v.badge].push(F); });
-    h += '<section class="section"><h2>기능 판정 <span class="sub">자세한 근거는 \'기능별 분석\' 탭</span></h2><div class="vsum">';
+    var scoreHtml = function (F) {
+      var a = PI[F.key] || [];
+      if (!a.length) return '<span class="vscore none">-</span>';
+      return a.map(function (x) {
+        var r = Math.round(x.avg * 10) / 10, cls = x.avg >= 4 ? "hi" : x.avg >= 3 ? "mid" : "lo";
+        return '<span class="vscore ' + cls + '" title="' + esc(x.menu) + " · " + x.n + '명 평균">' + (a.length > 1 ? '<i>' + esc(x.menu) + "</i>" : "") + "<b>" + r.toFixed(1) + "</b></span>";
+      }).join("");
+    };
+    h += '<section class="section"><h2>기능 판정 <span class="sub">점수는 인터뷰 직후 설문의 \'먼저 써보고 싶은 기능\' 평균(5점 만점, ' + posts.length + '명) · 자세한 근거는 \'기능별 분석\' 탭</span></h2><div class="vsum">';
     ["keep", "improve", "review"].forEach(function (k) {
+      groups[k].sort(function (a, b) { return topScore(b) - topScore(a); });
       h += '<div class="vsum-col ' + k + '"><div class="vsum-head">' + badge(k) + ' <b>' + groups[k].length + "</b></div>" +
-        groups[k].map(function (F) { return '<a class="vsum-item" href="#/?tab=features">' + esc(F.name) + '<span class="muted">' + esc((V[F.key] || {}).line || "") + "</span></a>"; }).join("") + "</div>";
+        groups[k].map(function (F) { return '<a class="vsum-item" href="#/?tab=features"><span class="vsum-row"><span class="vsum-name">' + esc(F.name) + '</span><span class="vscores">' + scoreHtml(F) + '</span></span><span class="muted">' + esc((V[F.key] || {}).line || "") + "</span></a>"; }).join("") + "</div>";
     });
     h += "</div></section>";
 
